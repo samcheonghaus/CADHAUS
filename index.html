@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CADHAUS — 2D/3D CAD Viewer · Editor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#10151c; --panel:#161d27; --panel2:#1b2432; --line:#28344a;
+    --ink:#dce6f2; --dim:#7d8ca3; --accent:#4da3ff; --accent2:#ffb454;
+    --danger:#ff6b6b; --ok:#5dd39e;
+    --mono:ui-monospace,'SF Mono','Cascadia Code',Consolas,monospace;
+    --sans:-apple-system,'Apple SD Gothic Neo','Segoe UI','Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px}
+
+  /* ── 상단 바 ── */
+  #topbar{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;
+    background:var(--panel);border-bottom:1px solid var(--line)}
+  #logo{font-family:var(--mono);font-weight:700;letter-spacing:.12em;font-size:14px}
+  #logo b{color:var(--accent)}
+  #filename{font-family:var(--mono);color:var(--dim);font-size:12px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+  .spacer{flex:1}
+  button,label.btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans);
+    display:inline-flex;align-items:center;gap:6px;user-select:none;white-space:nowrap}
+  button:hover,label.btn:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#0b1117;font-weight:600}
+  button.primary:hover{color:#0b1117;filter:brightness(1.1)}
+  button:disabled{opacity:.35;pointer-events:none}
+  input[type=file]{display:none}
+
+  /* ── 레이아웃 ── */
+  #main{display:flex;height:calc(100% - 48px - 26px)}
+  #toolbar{width:52px;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px}
+  .tool{width:38px;height:38px;border-radius:8px;border:1px solid transparent;background:none;
+    color:var(--dim);font-size:16px;display:flex;align-items:center;justify-content:center;padding:0}
+  .tool:hover{color:var(--ink);border-color:var(--line)}
+  .tool.active{background:var(--panel2);color:var(--accent);border-color:var(--accent)}
+  .tsep{width:26px;height:1px;background:var(--line);margin:5px 0}
+
+  #stage{flex:1;position:relative;min-width:0}
+  canvas#c2d{position:absolute;inset:0;display:block;cursor:crosshair}
+  #c3dwrap{position:absolute;inset:0;display:none}
+  #drop{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;
+    align-items:center;justify-content:center;color:var(--dim);pointer-events:none}
+  #drop .big{font-size:17px;color:var(--ink)}
+  #drop .hint{font-family:var(--mono);font-size:11px;line-height:1.9;text-align:center}
+  #drop .actions{pointer-events:auto;display:flex;gap:8px;margin-top:6px}
+
+  #side{width:230px;background:var(--panel);border-left:1px solid var(--line);
+    padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+  .sect h3{font-size:10px;letter-spacing:.15em;color:var(--dim);text-transform:uppercase;
+    margin-bottom:8px;font-family:var(--mono)}
+  .kv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;
+    padding:3px 0;color:var(--dim)}
+  .kv b{color:var(--ink);font-weight:500}
+  .row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+  .row input[type=number],.row input[type=text]{flex:1;min-width:0;background:var(--bg);
+    border:1px solid var(--line);color:var(--ink);border-radius:5px;padding:5px 7px;
+    font-family:var(--mono);font-size:12px}
+  .row input[type=color]{width:34px;height:28px;border:1px solid var(--line);border-radius:5px;
+    background:none;padding:2px;cursor:pointer}
+  .row label{font-size:11px;color:var(--dim);width:44px;flex-shrink:0}
+  .wide{width:100%;justify-content:center;margin-bottom:6px}
+  .check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);cursor:pointer}
+
+  /* ── 상태 바 ── */
+  #statusbar{height:26px;background:var(--panel);border-top:1px solid var(--line);
+    display:flex;align-items:center;gap:18px;padding:0 14px;font-family:var(--mono);
+    font-size:11px;color:var(--dim)}
+  #coords{min-width:190px;color:var(--accent)}
+  #msg{color:var(--ok)}
+
+  /* 텍스트 입력 오버레이 */
+  #textInput{position:absolute;display:none;background:var(--panel2);border:1px solid var(--accent);
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:4px 8px;border-radius:4px;
+    outline:none;min-width:140px;z-index:20}
+
+  @media (max-width:760px){ #side{display:none} }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span id="logo">CAD<b>HAUS</b></span>
+  <span id="filename">No file</span>
+  <div class="spacer"></div>
+  <button id="btnLang" title="Language"><b>EN</b> · KO</button>
+  <label class="btn primary" for="fileIn" data-i18n="open">📂 Open File</label>
+  <input type="file" id="fileIn" accept=".dxf,.stl,.obj,.stp,.step,.dwg">
+  <button id="btnDemo2d" data-i18n="demo2d">2D Sample</button>
+  <button id="btnDemo3d" data-i18n="demo3d">3D Sample</button>
+</div>
+
+<div id="main">
+  <div id="toolbar">
+    <button class="tool active" data-tool="select" data-i18n-title="tSelect" title="Select / Move (V)">➤</button>
+    <button class="tool" data-tool="pan" data-i18n-title="tPan" title="Pan (H)">✋</button>
+    <div class="tsep"></div>
+    <button class="tool" data-tool="line" data-i18n-title="tLine" title="Line (L)">╱</button>
+    <button class="tool" data-tool="rect" data-i18n-title="tRect" title="Rectangle (R)">▭</button>
+    <button class="tool" data-tool="circle" data-i18n-title="tCircle" title="Circle (C)">◯</button>
+    <button class="tool" data-tool="text" data-i18n-title="tText" title="Text (T)">Aa</button>
+    <button class="tool" data-tool="measure" data-i18n-title="tMeasure" title="Measure (M)">⇤⇥</button>
+    <div class="tsep"></div>
+    <button class="tool" id="btnDel" data-i18n-title="tDel" title="Delete selection (Del)">🗑</button>
+    <button class="tool" id="btnUndo" data-i18n-title="tUndo" title="Undo (Ctrl+Z)">↩</button>
+    <button class="tool" id="btnFit" data-i18n-title="tFit" title="Fit to view (F)">⛶</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="c2d"></canvas>
+    <div id="c3dwrap"></div>
+    <div id="drop">
+      <div class="big" data-i18n="dropBig">Drop a DXF · STL · OBJ · STEP file here</div>
+      <div class="hint" data-i18n-html="dropHint">2D drawings: DXF (convert DWG to DXF first)<br>
+        3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>
+        ※ STEP downloads a converter engine (~10MB) on first use — internet required<br>
+        View → quick edits → save as DXF / STL / PNG / PDF</div>
+      <div class="actions">
+        <button onclick="loadDemo2d()" data-i18n="openDemo2d">Open 2D sample</button>
+        <button onclick="loadDemo3d()" data-i18n="openDemo3d">Open 3D sample</button>
+      </div>
+    </div>
+    <input id="textInput" placeholder="Type text, then Enter">
+  </div>
+
+  <div id="side">
+    <div class="sect">
+      <h3 data-i18n="hFile">File Info</h3>
+      <div class="kv"><span data-i18n="lType">Format</span><b id="infoType">—</b></div>
+      <div class="kv"><span data-i18n="lCount">Objects</span><b id="infoCount">—</b></div>
+      <div class="kv"><span data-i18n="lSize">Size</span><b id="infoSize">—</b></div>
+    </div>
+
+    <div class="sect" id="sect2d">
+      <h3 data-i18n="h2d">2D Settings</h3>
+      <label class="check"><input type="checkbox" id="chkSnap" checked> <span data-i18n="snap">Grid snap</span></label>
+    </div>
+
+    <div class="sect" id="sectSel" style="display:none">
+      <h3 data-i18n="hSel">Selection</h3>
+      <div class="kv"><span data-i18n="lKind">Type</span><b id="selType">—</b></div>
+      <div class="row" id="rowRadius" style="display:none">
+        <label data-i18n="lRadius">Radius</label><input type="number" id="inRadius" step="any">
+      </div>
+      <div class="row" id="rowText" style="display:none">
+        <label data-i18n="lText">Text</label><input type="text" id="inText">
+      </div>
+      <div class="row" id="rowTextH" style="display:none">
+        <label data-i18n="lHeight">Height</label><input type="number" id="inTextH" step="any">
+      </div>
+    </div>
+
+    <div class="sect" id="sect3d" style="display:none">
+      <h3 data-i18n="h3d">3D Edit</h3>
+      <div class="row">
+        <label data-i18n="lColor">Color</label><input type="color" id="inColor" value="#8fb4dc">
+        <label class="check" style="width:auto"><input type="checkbox" id="chkWire"> <span data-i18n="wire">Wire</span></label>
+      </div>
+      <div class="row">
+        <label data-i18n="lRotate">Rotate</label>
+        <button id="rotX" style="flex:1">X 90°</button>
+        <button id="rotY" style="flex:1">Y 90°</button>
+        <button id="rotZ" style="flex:1">Z 90°</button>
+      </div>
+      <div class="row">
+        <label data-i18n="lScale">Scale</label><input type="number" id="inScale" value="1" step="0.1" min="0.01">
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3 data-i18n="hSave">Save</h3>
+      <button class="wide" id="btnSaveNative" data-i18n="saveNative">💾 Save DXF / STL</button>
+      <button class="wide" id="btnSavePng" data-i18n="savePng">🖼 Save PNG</button>
+      <button class="wide primary" id="btnSavePdf" data-i18n="savePdf">📄 Save PDF</button>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="coords">X: —  Y: —</span>
+  <span id="zoomInfo">Zoom —</span>
+  <span id="msg"></span>
+</div>
+
+<script>
+/* ═══════════════ 공통 상태 ═══════════════ */
+const $=id=>document.getElementById(id);
+let mode=null;                 // '2d' | '3d'
+let curFileName='drawing';
+const stage=$('stage');
+function setMsg(t,warn){$('msg').textContent=t;$('msg').style.color=warn?'var(--accent2)':'var(--ok)';
+  clearTimeout(setMsg._t);setMsg._t=setTimeout(()=>$('msg').textContent='',5000);}
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
+
+/* ═══════════════ 언어 (EN 기본 / KO 지원) ═══════════════ */
+let lang='en', fileLoaded=false, infoT=null, triCount=0;
+const I18N={
+en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file',
+  tSelect:'Select / Move (V)',tPan:'Pan (H)',tLine:'Line (L)',tRect:'Rectangle (R)',
+  tCircle:'Circle (C)',tText:'Text (T)',tMeasure:'Measure (M)',tDel:'Delete selection (Del)',
+  tUndo:'Undo (Ctrl+Z)',tFit:'Fit to view (F)',
+  dropBig:'Drop a DXF · STL · OBJ · STEP file here',
+  dropHint:'2D drawings: DXF (convert DWG to DXF first)<br>3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>※ STEP downloads a converter engine (~10MB) on first use — internet required<br>View → quick edits → save as DXF / STL / PNG / PDF',
+  openDemo2d:'Open 2D sample',openDemo3d:'Open 3D sample',
+  hFile:'File Info',lType:'Format',lCount:'Objects',lSize:'Size',
+  h2d:'2D Settings',snap:'Grid snap',hSel:'Selection',lKind:'Type',lRadius:'Radius',
+  lText:'Text',lHeight:'Height',h3d:'3D Edit',lColor:'Color',wire:'Wire',
+  lRotate:'Rotate',lScale:'Scale',hSave:'Save',saveNative:'💾 Save DXF / STL',
+  savePng:'🖼 Save PNG',savePdf:'📄 Save PDF',textPh:'Type text, then Enter',
+  coords0:'X: —  Y: —',zoom0:'Zoom —',zoom:'Zoom',grid:'grid',
+  orbit:'Drag: rotate · Right-drag/Shift: pan · Wheel: zoom',
+  objects:'objects',tris:'triangles',parts:'parts',sample:'(sample)',
+  LINE:'Line',CIRCLE:'Circle',ARC:'Arc',PLINE:'Polyline',TEXT:'Text',MEASURE:'Dimension',
+  undone:'Undone',deleted:'Deleted',dxfSaved:'DXF saved',
+  stlSaved:'STL saved (edits applied)',pngSaved:'PNG saved',pdfSaved:'PDF saved',
+  dxfLoaded:'DXF loaded',noEnts:'No supported objects found (blocks/INSERT not supported)',
+  objLoaded:'OBJ loaded',stlLoaded:'STL loaded',
+  errRead:'Read error: ',errStl:'STL read error: ',errStep:'STEP error: ',
+  unsupported:'Supported: DXF · STL · OBJ · STP/STEP',
+  dwgMsg:'DWG is a binary format and cannot be read directly in the browser',
+  dwgAlert:'DWG files cannot be opened directly in the browser.\n\nPlease convert to DXF first:\n· AutoCAD → Save As → DXF\n· Free ODA File Converter (batch)\n· Free CAD tools like LibreCAD → save as DXF',
+  stepPrep:'Preparing STEP engine… (10–20s on first use)',
+  stepConv:'Converting STEP geometry…',
+  stepNet:'Could not download the STEP engine (check internet connection)',
+  stepNone:'No shapes could be extracted from this STEP file',
+  stepLoaded:'STEP loaded',merged:'parts merged',
+  typeDxf:'DXF (2D)',typeObj:'OBJ (3D)',typeStl:'STL (3D)',typeStep:'STEP (3D)',
+  type3ds:'3D sample',
+  demo2dMsg:'Sample drawing — click to select, drag to move',
+  demo3dMsg:'Drag to rotate, scroll to zoom'},
+ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파일 없음',
+  tSelect:'선택 / 이동 (V)',tPan:'화면 이동 (H)',tLine:'선 그리기 (L)',tRect:'사각형 (R)',
+  tCircle:'원 (C)',tText:'문자 (T)',tMeasure:'치수 측정 (M)',tDel:'선택 삭제 (Del)',
+  tUndo:'실행 취소 (Ctrl+Z)',tFit:'화면에 맞춤 (F)',
+  dropBig:'DXF · STL · OBJ · STEP 파일을 끌어다 놓으세요',
+  dropHint:'2D 도면: DXF (DWG는 DXF로 변환 후 사용)<br>3D 모델: STL(ASCII/바이너리) · OBJ · STP/STEP<br>※ STEP은 첫 사용 시 변환 엔진(약 10MB)을 내려받습니다 — 인터넷 필요<br>보기 → 간단 편집 → DXF / STL / PNG / PDF 저장',
+  openDemo2d:'2D 예제 열기',openDemo3d:'3D 예제 열기',
+  hFile:'파일 정보',lType:'형식',lCount:'객체 수',lSize:'크기',
+  h2d:'2D 설정',snap:'그리드 스냅',hSel:'선택 객체',lKind:'종류',lRadius:'반지름',
+  lText:'내용',lHeight:'높이',h3d:'3D 편집',lColor:'색상',wire:'와이어',
+  lRotate:'회전',lScale:'배율',hSave:'저장',saveNative:'💾 DXF / STL 저장',
+  savePng:'🖼 PNG 저장',savePdf:'📄 PDF 저장',textPh:'문자 입력 후 Enter',
+  coords0:'X: —  Y: —',zoom0:'배율 —',zoom:'배율',grid:'그리드',
+  orbit:'드래그: 회전 · 우클릭/Shift: 이동 · 휠: 확대',
+  objects:'객체',tris:'삼각형',parts:'파트',sample:'(예제)',
+  LINE:'선',CIRCLE:'원',ARC:'호',PLINE:'폴리라인',TEXT:'문자',MEASURE:'치수',
+  undone:'실행 취소',deleted:'삭제됨',dxfSaved:'DXF 저장 완료',
+  stlSaved:'STL 저장 완료 (편집 내용 반영)',pngSaved:'PNG 저장 완료',pdfSaved:'PDF 저장 완료',
+  dxfLoaded:'DXF 열기 완료',noEnts:'지원되는 객체를 찾지 못했습니다 (블록/INSERT는 미지원)',
+  objLoaded:'OBJ 열기 완료',stlLoaded:'STL 열기 완료',
+  errRead:'파일 읽기 오류: ',errStl:'STL 읽기 오류: ',errStep:'STEP 오류: ',
+  unsupported:'지원 형식: DXF · STL · OBJ · STP/STEP',
+  dwgMsg:'DWG는 바이너리 형식이라 브라우저에서 직접 읽을 수 없습니다',
+  dwgAlert:'DWG 파일은 브라우저에서 직접 열 수 없습니다.\n\n다음 방법으로 DXF로 변환한 뒤 열어주세요:\n· AutoCAD → 다른 이름으로 저장 → DXF\n· 무료 ODA File Converter (일괄 변환)\n· LibreCAD 등 무료 CAD에서 DXF로 저장',
+  stepPrep:'STEP 변환 엔진 준비 중… (첫 사용 시 10~20초)',
+  stepConv:'STEP 형상 변환 중…',
+  stepNet:'STEP 변환 엔진을 내려받지 못했습니다 (인터넷 연결 확인)',
+  stepNone:'STEP 파일에서 형상을 추출하지 못했습니다',
+  stepLoaded:'STEP 열기 완료',merged:'개 파트 병합',
+  typeDxf:'DXF (2D)',typeObj:'OBJ (3D)',typeStl:'STL (3D)',typeStep:'STEP (3D)',
+  type3ds:'3D 예제',
+  demo2dMsg:'예제 도면 — 클릭해 선택, 드래그로 이동해 보세요',
+  demo3dMsg:'드래그로 회전, 휠로 확대해 보세요'}
+};
+const t=k=>(I18N[lang][k]!==undefined?I18N[lang][k]:k);
+function setInfoType(key,n){infoT={key,n:n||0};refreshInfoType();}
+function refreshInfoType(){if(!infoT)return;
+  $('infoType').textContent=t(infoT.key)+(infoT.n?` · ${infoT.n} ${t('parts')}`:'');}
+function applyLang(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>el.innerHTML=t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>el.title=t(el.dataset.i18nTitle));
+  $('textInput').placeholder=t('textPh');
+  $('btnLang').innerHTML=lang==='en'?'<b>EN</b> · KO':'EN · <b>KO</b>';
+  if(!fileLoaded)$('filename').textContent=t('nofile');
+  if(mode===null){$('coords').textContent=t('coords0');$('zoomInfo').textContent=t('zoom0');}
+  if(mode==='3d')$('coords').textContent=t('orbit');
+  refreshInfoType();updateSel();updateInfo();
+  if(mode==='2d')render();
+}
+
+/* ═══════════════ 2D : 상태 & 렌더 ═══════════════ */
+const cv=$('c2d'), ctx=cv.getContext('2d');
+let ents=[];                   // {type:'LINE'|'CIRCLE'|'ARC'|'PLINE'|'TEXT'|'MEASURE', ...}
+let view={cx:0,cy:0,zoom:1};
+let tool='select', selected=-1, undoStack=[];
+let drag=null, temp=null;      // 진행 중 그리기/드래그 상태
+const DPR=window.devicePixelRatio||1;
+
+function resize(){
+  const r=stage.getBoundingClientRect();
+  cv.width=r.width*DPR; cv.height=r.height*DPR;
+  cv.style.width=r.width+'px'; cv.style.height=r.height+'px';
+  if(mode==='3d') resize3d(r.width,r.height);
+  render();
+}
+window.addEventListener('resize',resize);
+
+function W2S(x,y){const r=cv.width/DPR,h=cv.height/DPR;
+  return [(x-view.cx)*view.zoom+r/2,h/2-(y-view.cy)*view.zoom];}
+function S2W(sx,sy){const r=cv.width/DPR,h=cv.height/DPR;
+  return [(sx-r/2)/view.zoom+view.cx,(h/2-sy)/view.zoom+view.cy];}
+
+function gridStep(){ // 화면상 40~120px 간격이 되는 1·2·5 계열
+  const target=70/view.zoom; const p=Math.pow(10,Math.floor(Math.log10(target)));
+  for(const m of [1,2,5,10]) if(p*m>=target) return p*m; return p*10;
+}
+
+function render(){
+  if(mode!=='2d'){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,cv.width,cv.height);return;}
+  const w=cv.width/DPR,h=cv.height/DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#10151c';ctx.fillRect(0,0,w,h);
+  // 그리드
+  const step=gridStep();
+  const [x0,y1]=S2W(0,0),[x1,y0]=S2W(w,h);
+  ctx.lineWidth=1;
+  for(let gx=Math.floor(x0/step)*step;gx<=x1;gx+=step){
+    const M=Math.round(gx/step)%5===0;
+    ctx.strokeStyle=M?'#1f2b3d':'#182130';
+    const [sx]=W2S(gx,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,h);ctx.stroke();}
+  for(let gy=Math.floor(y0/step)*step;gy<=y1;gy+=step){
+    const M=Math.round(gy/step)%5===0;
+    ctx.strokeStyle=M?'#1f2b3d':'#182130';
+    const [,sy]=W2S(0,gy);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(w,sy);ctx.stroke();}
+  // 원점 축
+  const [ox,oy]=W2S(0,0);
+  ctx.strokeStyle='#31425e';ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,h);
+  ctx.moveTo(0,oy);ctx.lineTo(w,oy);ctx.stroke();
+  // 객체
+  ents.forEach((e,i)=>drawEnt(ctx,e,{sel:i===selected}));
+  if(temp&&temp.preview) drawEnt(ctx,temp.preview,{ghost:true});
+  $('zoomInfo').textContent=t('zoom')+' '+(view.zoom>=1?view.zoom.toFixed(1):view.zoom.toFixed(3))+'×  '+t('grid')+' '+step;
+}
+
+function drawEnt(g,e,opt={}){
+  const P=(x,y)=>opt.print?opt.print.map(x,y):W2S(x,y);
+  const z=opt.print?opt.print.scale:view.zoom;
+  g.lineWidth=opt.print?Math.max(.8,1.2):(opt.sel?2.2:1.4);
+  const base=opt.print?'#111':(e.color||'#dce6f2');
+  g.strokeStyle=opt.ghost?'#4da3ff':(opt.sel?'#ffb454':base);
+  g.fillStyle=g.strokeStyle;
+  g.setLineDash(opt.ghost?[5,4]:[]);
+  g.beginPath();
+  if(e.type==='LINE'||e.type==='MEASURE'){
+    const a=P(e.x1,e.y1),b=P(e.x2,e.y2);
+    g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();
+    if(e.type==='MEASURE'){
+      const d=Math.hypot(e.x2-e.x1,e.y2-e.y1);
+      const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+      g.font=`${Math.max(10,11)}px var(--mono)`;g.font='11px ui-monospace,monospace';
+      g.fillText(d.toFixed(2),mx+6,my-6);
+      for(const p of [a,b]){g.beginPath();g.arc(p[0],p[1],2.5,0,7);g.fill();}
+    }
+  }else if(e.type==='CIRCLE'){
+    const c=P(e.x,e.y);g.arc(c[0],c[1],e.r*z,0,Math.PI*2);g.stroke();
+  }else if(e.type==='ARC'){
+    const c=P(e.x,e.y),s=e.a1*Math.PI/180,en=e.a2*Math.PI/180;
+    if(opt.print){g.arc(c[0],c[1],e.r*z,-s,-en,true);} else {g.arc(c[0],c[1],e.r*z,-s,-en,true);}
+    g.stroke();
+  }else if(e.type==='PLINE'){
+    e.v.forEach((p,i)=>{const s=P(p[0],p[1]); i?g.lineTo(s[0],s[1]):g.moveTo(s[0],s[1]);});
+    if(e.closed)g.closePath();g.stroke();
+  }else if(e.type==='TEXT'){
+    const c=P(e.x,e.y);
+    g.font=`${Math.max(2,(e.h||5)*z)}px ui-monospace,monospace`;
+    g.fillText(e.text,c[0],c[1]);
+    if(opt.sel){g.strokeStyle='#ffb454';g.strokeRect(c[0]-3,c[1]-(e.h||5)*z-3,
+      g.measureText(e.text).width+6,(e.h||5)*z+8);}
+  }
+  g.setLineDash([]);
+}
+
+/* ═══════════════ 2D : DXF 파서 ═══════════════ */
+const ACI={1:'#ff5f5f',2:'#ffd75f',3:'#6fe08f',4:'#5fd7ff',5:'#6f8fff',6:'#ff7fff',8:'#8a8a8a',9:'#c0c0c0'};
+function parseDXF(text){
+  const L=text.split(/\r\n|\r|\n/), out=[];
+  const pairs=[];
+  for(let i=0;i+1<L.length;i+=2)pairs.push([parseInt(L[i].trim(),10),L[i+1].trim()]);
+  let i=0,inEnt=false;
+  const num=v=>parseFloat(v)||0;
+  while(i<pairs.length){
+    const [c,v]=pairs[i];
+    if(c===2&&v==='ENTITIES')inEnt=true;
+    if(c===0&&v==='ENDSEC')inEnt=false;
+    if(inEnt&&c===0&&!['SECTION','ENDSEC'].includes(v)){
+      const T=v;const p={};const verts=[];let mtext='';
+      i++;
+      while(i<pairs.length&&pairs[i][0]!==0){
+        const [cc,vv]=pairs[i];
+        if(cc===10)verts.push([num(vv),0]);
+        else if(cc===20&&verts.length)verts[verts.length-1][1]=num(vv);
+        else if(cc===1||cc===3)mtext+=vv;
+        else p[cc]=vv;
+        i++;
+      }
+      const col=ACI[parseInt(p[62],10)]||null;
+      const fin=e=>{if(col)e.color=col;out.push(e);};
+      if(T==='LINE'&&verts.length>=1)
+        fin({type:'LINE',x1:verts[0][0],y1:verts[0][1],x2:num(p[11]),y2:num(p[21])});
+      else if(T==='CIRCLE'&&verts.length)
+        fin({type:'CIRCLE',x:verts[0][0],y:verts[0][1],r:num(p[40])});
+      else if(T==='ARC'&&verts.length)
+        fin({type:'ARC',x:verts[0][0],y:verts[0][1],r:num(p[40]),a1:num(p[50]),a2:num(p[51])});
+      else if((T==='LWPOLYLINE'||T==='POLYLINE')&&verts.length>1)
+        fin({type:'PLINE',v:verts,closed:(parseInt(p[70],10)&1)===1});
+      else if((T==='TEXT'||T==='MTEXT')&&verts.length){
+        const t=mtext.replace(/\\\\[A-Za-z][^;]*;|[{}]/g,'').replace(/\\\\P/g,' ');
+        if(t)fin({type:'TEXT',x:verts[0][0],y:verts[0][1],h:num(p[40])||5,text:t});
+      }
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+/* ═══════════════ 2D : DXF 내보내기 ═══════════════ */
+function dxfOut(){
+  const P=[]; const push=(c,v)=>P.push(c,v);
+  push(0,'SECTION');push(2,'ENTITIES');
+  for(const e of ents){
+    if(e.type==='LINE'||e.type==='MEASURE'){
+      push(0,'LINE');push(8,'0');push(10,e.x1);push(20,e.y1);push(30,0);
+      push(11,e.x2);push(21,e.y2);push(31,0);
+      if(e.type==='MEASURE'){const d=Math.hypot(e.x2-e.x1,e.y2-e.y1);
+        push(0,'TEXT');push(8,'0');push(10,(e.x1+e.x2)/2);push(20,(e.y1+e.y2)/2);push(30,0);
+        push(40,3);push(1,d.toFixed(2));}
+    }else if(e.type==='CIRCLE'){
+      push(0,'CIRCLE');push(8,'0');push(10,e.x);push(20,e.y);push(30,0);push(40,e.r);
+    }else if(e.type==='ARC'){
+      push(0,'ARC');push(8,'0');push(10,e.x);push(20,e.y);push(30,0);
+      push(40,e.r);push(50,e.a1);push(51,e.a2);
+    }else if(e.type==='PLINE'){
+      push(0,'LWPOLYLINE');push(8,'0');push(90,e.v.length);push(70,e.closed?1:0);
+      for(const p of e.v){push(10,p[0]);push(20,p[1]);}
+    }else if(e.type==='TEXT'){
+      push(0,'TEXT');push(8,'0');push(10,e.x);push(20,e.y);push(30,0);
+      push(40,e.h||5);push(1,e.text);
+    }
+  }
+  push(0,'ENDSEC');push(0,'EOF');
+  return P.join('\n')+'\n';
+}
+
+/* ═══════════════ 2D : 조작 (선택·이동·그리기) ═══════════════ */
+function distSeg(px,py,x1,y1,x2,y2){
+  const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
+  const t=L2?Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/L2)):0;
+  return Math.hypot(px-(x1+t*dx),py-(y1+t*dy));
+}
+function hitTest(wx,wy){
+  const tol=7/view.zoom;
+  for(let i=ents.length-1;i>=0;i--){const e=ents[i];
+    if(e.type==='LINE'||e.type==='MEASURE'){if(distSeg(wx,wy,e.x1,e.y1,e.x2,e.y2)<tol)return i;}
+    else if(e.type==='CIRCLE'){if(Math.abs(Math.hypot(wx-e.x,wy-e.y)-e.r)<tol)return i;}
+    else if(e.type==='ARC'){
+      const d=Math.hypot(wx-e.x,wy-e.y);
+      if(Math.abs(d-e.r)<tol){let a=Math.atan2(wy-e.y,wx-e.x)*180/Math.PI;if(a<0)a+=360;
+        let a1=e.a1%360,a2=e.a2%360;if(a1<0)a1+=360;if(a2<0)a2+=360;
+        const inArc=a1<=a2?(a>=a1&&a<=a2):(a>=a1||a<=a2);if(inArc)return i;}}
+    else if(e.type==='PLINE'){for(let k=0;k<e.v.length-1;k++)
+        if(distSeg(wx,wy,e.v[k][0],e.v[k][1],e.v[k+1][0],e.v[k+1][1])<tol)return i;
+      if(e.closed&&e.v.length>2){const a=e.v[e.v.length-1],b=e.v[0];
+        if(distSeg(wx,wy,a[0],a[1],b[0],b[1])<tol)return i;}}
+    else if(e.type==='TEXT'){const w=(e.text.length*(e.h||5)*.62),h=e.h||5;
+      if(wx>=e.x-tol&&wx<=e.x+w+tol&&wy>=e.y-tol&&wy<=e.y+h+tol)return i;}
+  }
+  return -1;
+}
+function moveEnt(e,dx,dy){
+  if(e.type==='LINE'||e.type==='MEASURE'){e.x1+=dx;e.y1+=dy;e.x2+=dx;e.y2+=dy;}
+  else if(e.type==='CIRCLE'||e.type==='ARC'||e.type==='TEXT'){e.x+=dx;e.y+=dy;}
+  else if(e.type==='PLINE')e.v.forEach(p=>{p[0]+=dx;p[1]+=dy;});
+}
+function snap(x,y){
+  if(!$('chkSnap').checked)return [x,y];
+  const s=gridStep()/5;return [Math.round(x/s)*s,Math.round(y/s)*s];
+}
+function saveUndo(){undoStack.push(JSON.stringify(ents));if(undoStack.length>50)undoStack.shift();}
+function undo(){if(!undoStack.length)return;ents=JSON.parse(undoStack.pop());selected=-1;
+  updateSel();updateInfo();render();setMsg(t('undone'));}
+
+let panning=null;
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('wheel',e=>{
+  if(mode!=='2d')return;e.preventDefault();
+  const [wx,wy]=S2W(e.offsetX,e.offsetY);
+  const f=e.deltaY<0?1.15:1/1.15;view.zoom*=f;
+  const [nx,ny]=S2W(e.offsetX,e.offsetY);
+  view.cx+=wx-nx;view.cy+=wy-ny;render();
+},{passive:false});
+
+cv.addEventListener('pointerdown',e=>{
+  if(mode!=='2d')return;
+  cv.setPointerCapture(e.pointerId);
+  const [rwx,rwy]=S2W(e.offsetX,e.offsetY);
+  const [wx,wy]=snap(rwx,rwy);
+  if(e.button===1||e.button===2||tool==='pan'){
+    panning={sx:e.offsetX,sy:e.offsetY,cx:view.cx,cy:view.cy};return;}
+  if(tool==='select'){
+    const h=hitTest(rwx,rwy);selected=h;updateSel();render();
+    if(h>=0){saveUndo();drag={i:h,lx:rwx,ly:rwy,moved:false};}
+  }else if(tool==='line'||tool==='measure'){
+    if(!temp){temp={t:tool,x1:wx,y1:wy,preview:null};}
+    else{saveUndo();ents.push({type:tool==='line'?'LINE':'MEASURE',
+      x1:temp.x1,y1:temp.y1,x2:wx,y2:wy});temp=null;updateInfo();render();}
+  }else if(tool==='rect'){
+    if(!temp){temp={t:'rect',x1:wx,y1:wy,preview:null};}
+    else{saveUndo();ents.push({type:'PLINE',closed:true,
+      v:[[temp.x1,temp.y1],[wx,temp.y1],[wx,wy],[temp.x1,wy]]});temp=null;updateInfo();render();}
+  }else if(tool==='circle'){
+    if(!temp){temp={t:'circle',x1:wx,y1:wy,preview:null};}
+    else{saveUndo();ents.push({type:'CIRCLE',x:temp.x1,y:temp.y1,
+      r:Math.hypot(wx-temp.x1,wy-temp.y1)});temp=null;updateInfo();render();}
+  }else if(tool==='text'){
+    const ti=$('textInput');
+    ti.style.left=e.offsetX+'px';ti.style.top=e.offsetY+'px';
+    ti.style.display='block';ti.value='';ti.focus();
+    ti._wx=wx;ti._wy=wy;
+  }
+});
+cv.addEventListener('pointermove',e=>{
+  if(mode!=='2d')return;
+  const [rwx,rwy]=S2W(e.offsetX,e.offsetY);
+  $('coords').textContent=`X: ${rwx.toFixed(2)}  Y: ${rwy.toFixed(2)}`;
+  if(panning){view.cx=panning.cx-(e.offsetX-panning.sx)/view.zoom;
+    view.cy=panning.cy+(e.offsetY-panning.sy)/view.zoom;render();return;}
+  if(drag){const dx=rwx-drag.lx,dy=rwy-drag.ly;
+    if(Math.abs(dx)+Math.abs(dy)>0){moveEnt(ents[drag.i],dx,dy);
+      drag.lx=rwx;drag.ly=rwy;drag.moved=true;render();}return;}
+  if(temp){const [wx,wy]=snap(rwx,rwy);
+    if(temp.t==='line')temp.preview={type:'LINE',x1:temp.x1,y1:temp.y1,x2:wx,y2:wy};
+    if(temp.t==='measure')temp.preview={type:'MEASURE',x1:temp.x1,y1:temp.y1,x2:wx,y2:wy};
+    if(temp.t==='rect')temp.preview={type:'PLINE',closed:true,
+      v:[[temp.x1,temp.y1],[wx,temp.y1],[wx,wy],[temp.x1,wy]]};
+    if(temp.t==='circle')temp.preview={type:'CIRCLE',x:temp.x1,y:temp.y1,
+      r:Math.hypot(wx-temp.x1,wy-temp.y1)};
+    render();}
+});
+cv.addEventListener('pointerup',e=>{
+  if(drag&&!drag.moved)undoStack.pop(); // 이동 없으면 스냅샷 회수
+  drag=null;panning=null;
+});
+$('textInput').addEventListener('keydown',e=>{
+  const ti=$('textInput');
+  if(e.key==='Enter'&&ti.value.trim()){
+    saveUndo();ents.push({type:'TEXT',x:ti._wx,y:ti._wy,h:gridStep()/4,text:ti.value.trim()});
+    ti.style.display='none';updateInfo();render();
+  }else if(e.key==='Escape')ti.style.display='none';
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='Delete'||e.key==='Backspace')delSelected();
+  else if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
+  else if(e.key==='Escape'){temp=null;selected=-1;updateSel();render();}
+  else if(e.key==='f'||e.key==='F')fitView();
+  else{const map={v:'select',h:'pan',l:'line',r:'rect',c:'circle',t:'text',m:'measure'};
+    if(map[e.key.toLowerCase()])setTool(map[e.key.toLowerCase()]);}
+});
+function delSelected(){if(mode!=='2d'||selected<0)return;
+  saveUndo();ents.splice(selected,1);selected=-1;updateSel();updateInfo();render();setMsg(t('deleted'));}
+
+function setTool(t){tool=t;temp=null;
+  document.querySelectorAll('.tool[data-tool]').forEach(b=>
+    b.classList.toggle('active',b.dataset.tool===t));
+  cv.style.cursor=t==='pan'?'grab':'crosshair';render();}
+document.querySelectorAll('.tool[data-tool]').forEach(b=>
+  b.addEventListener('click',()=>setTool(b.dataset.tool)));
+$('btnDel').addEventListener('click',delSelected);
+$('btnUndo').addEventListener('click',undo);
+$('btnFit').addEventListener('click',()=>fitView());
+
+/* 선택 패널 */
+function updateSel(){
+  const s=$('sectSel');
+  if(mode!=='2d'||selected<0){s.style.display='none';return;}
+  const e=ents[selected];s.style.display='block';
+  $('selType').textContent=t(e.type);
+  $('rowRadius').style.display=e.type==='CIRCLE'||e.type==='ARC'?'flex':'none';
+  $('rowText').style.display=$('rowTextH').style.display=e.type==='TEXT'?'flex':'none';
+  if(e.r!==undefined)$('inRadius').value=e.r;
+  if(e.type==='TEXT'){$('inText').value=e.text;$('inTextH').value=e.h;}
+}
+$('inRadius').addEventListener('input',()=>{if(selected<0)return;
+  const v=parseFloat($('inRadius').value);if(v>0){ents[selected].r=v;render();}});
+$('inText').addEventListener('input',()=>{if(selected<0)return;
+  ents[selected].text=$('inText').value;render();});
+$('inTextH').addEventListener('input',()=>{if(selected<0)return;
+  const v=parseFloat($('inTextH').value);if(v>0){ents[selected].h=v;render();}});
+
+/* 화면 맞춤 & bbox */
+function bbox2d(){
+  if(!ents.length)return null;
+  let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18;
+  const ex=(x,y)=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);};
+  for(const e of ents){
+    if(e.type==='LINE'||e.type==='MEASURE'){ex(e.x1,e.y1);ex(e.x2,e.y2);}
+    else if(e.type==='CIRCLE'||e.type==='ARC'){ex(e.x-e.r,e.y-e.r);ex(e.x+e.r,e.y+e.r);}
+    else if(e.type==='PLINE')e.v.forEach(p=>ex(p[0],p[1]));
+    else if(e.type==='TEXT'){ex(e.x,e.y);ex(e.x+e.text.length*(e.h||5)*.62,e.y+(e.h||5));}
+  }
+  return {x0,y0,x1,y1,w:x1-x0||1,h:y1-y0||1};
+}
+function fitView(){
+  if(mode==='3d'){resetCam();return;}
+  const b=bbox2d();if(!b)return;
+  const w=cv.width/DPR,h=cv.height/DPR;
+  view.zoom=Math.min(w/b.w,h/b.h)*.85;
+  view.cx=(b.x0+b.x1)/2;view.cy=(b.y0+b.y1)/2;render();
+}
+
+/* ═══════════════ 3D ═══════════════ */
+let scene,camera,renderer,mesh3,grid3;
+let cam={theta:.8,phi:1.05,dist:10,tx:0,ty:0,tz:0};
+function init3d(){
+  if(renderer)return;
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x10151c);
+  camera=new THREE.PerspectiveCamera(50,1,0.01,5000);
+  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+  renderer.setPixelRatio(DPR);
+  $('c3dwrap').appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xdde6f5,0x1a2230,1.0));
+  const d=new THREE.DirectionalLight(0xffffff,.8);d.position.set(5,8,6);scene.add(d);
+  grid3=new THREE.GridHelper(20,20,0x31425e,0x1f2b3d);scene.add(grid3);
+  const el=renderer.domElement;
+  el.style.touchAction='none';
+  let p3=null;
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);
+    p3={x:e.clientX,y:e.clientY,btn:e.button,shift:e.shiftKey};});
+  el.addEventListener('pointerup',()=>p3=null);
+  el.addEventListener('pointermove',e=>{
+    if(!p3)return;
+    const dx=e.clientX-p3.x,dy=e.clientY-p3.y;p3.x=e.clientX;p3.y=e.clientY;
+    if(p3.btn===2||p3.shift){ // 팬
+      const s=cam.dist*.0016;
+      const cx=Math.cos(cam.theta),sx=Math.sin(cam.theta);
+      cam.tx-=(dx*cx)*s; cam.tz-=(dx*sx)*s; cam.ty+=dy*s;
+    }else{cam.theta-=dx*.008;cam.phi=Math.max(.05,Math.min(Math.PI-.05,cam.phi-dy*.008));}
+  });
+  el.addEventListener('wheel',e=>{e.preventDefault();
+    cam.dist*=e.deltaY>0?1.12:1/1.12;cam.dist=Math.max(.05,cam.dist);},{passive:false});
+  (function loop(){requestAnimationFrame(loop);
+    if(mode!=='3d')return;
+    camera.position.set(
+      cam.tx+cam.dist*Math.sin(cam.phi)*Math.cos(cam.theta),
+      cam.ty+cam.dist*Math.cos(cam.phi),
+      cam.tz+cam.dist*Math.sin(cam.phi)*Math.sin(cam.theta));
+    camera.lookAt(cam.tx,cam.ty,cam.tz);
+    renderer.render(scene,camera);
+  })();
+}
+function resize3d(w,h){if(!renderer)return;
+  renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function setMesh(geo){
+  init3d();
+  if(mesh3){scene.remove(mesh3);mesh3.geometry.dispose();}
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();const b=geo.boundingBox;
+  const c=new THREE.Vector3();b.getCenter(c);
+  geo.translate(-c.x,-b.min.y,-c.z); // 바닥 기준 중앙
+  const size=new THREE.Vector3();b.getSize(size);
+  const m=new THREE.MeshPhongMaterial({color:$('inColor').value,
+    shininess:28,wireframe:$('chkWire').checked,side:THREE.DoubleSide});
+  mesh3=new THREE.Mesh(geo,m);scene.add(mesh3);
+  const R=Math.max(size.x,size.y,size.z);
+  cam.dist=R*2.2;cam.tx=0;cam.ty=size.y/2;cam.tz=0;cam.theta=.8;cam.phi=1.05;
+  grid3.scale.setScalar(Math.max(.2,R/10));
+  triCount=geo.attributes.position.count/3;
+  $('infoCount').textContent=triCount.toLocaleString()+' '+t('tris');
+  $('infoSize').textContent=`${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)}`;
+}
+function resetCam(){if(mesh3){const b=new THREE.Box3().setFromObject(mesh3);
+  const s=new THREE.Vector3();b.getSize(s);cam.dist=Math.max(s.x,s.y,s.z)*2.2;
+  cam.theta=.8;cam.phi=1.05;cam.tx=0;cam.ty=s.y/2;cam.tz=0;}}
+$('inColor').addEventListener('input',()=>{if(mesh3)mesh3.material.color.set($('inColor').value);});
+$('chkWire').addEventListener('change',()=>{if(mesh3)mesh3.material.wireframe=$('chkWire').checked;});
+$('inScale').addEventListener('input',()=>{const v=parseFloat($('inScale').value);
+  if(mesh3&&v>0)mesh3.scale.setScalar(v);});
+for(const [id,ax] of [['rotX','x'],['rotY','y'],['rotZ','z']])
+  $(id).addEventListener('click',()=>{if(mesh3)mesh3.rotation[ax]+=Math.PI/2;});
+
+/* STL 파서 */
+function parseSTL(buf){
+  const dv=new DataView(buf);
+  const head=new TextDecoder().decode(new Uint8Array(buf,0,Math.min(80,buf.byteLength))).trim();
+  const isAscii=head.startsWith('solid')&&buf.byteLength<84+dv.getUint32(80,true)*50;
+  let pos;
+  if(!head.startsWith('solid')||(buf.byteLength>=84&&buf.byteLength===84+dv.getUint32(80,true)*50)){
+    const n=dv.getUint32(80,true);pos=new Float32Array(n*9);
+    for(let i=0;i<n;i++){const o=84+i*50;
+      for(let v=0;v<3;v++)for(let k=0;k<3;k++)
+        pos[i*9+v*3+k]=dv.getFloat32(o+12+v*12+k*4,true);}
+  }else{
+    const txt=new TextDecoder().decode(buf);const arr=[];
+    const re=/vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g;let m;
+    while((m=re.exec(txt)))arr.push(+m[1],+m[2],+m[3]);
+    pos=new Float32Array(arr);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  return g;
+}
+/* OBJ 파서 (v/f, 삼각 분할) */
+function parseOBJ(txt){
+  const vs=[],out=[];
+  for(const line of txt.split('\n')){
+    const t=line.trim().split(/\s+/);
+    if(t[0]==='v')vs.push([+t[1],+t[2],+t[3]]);
+    else if(t[0]==='f'){
+      const idx=t.slice(1).map(s=>{let i=parseInt(s.split('/')[0],10);
+        return i<0?vs.length+i:i-1;});
+      for(let k=1;k<idx.length-1;k++)
+        out.push(...vs[idx[0]],...vs[idx[k]],...vs[idx[k+1]]);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(out),3));
+  return g;
+}
+/* STEP 로더 — OpenCascade WASM(occt-import-js)을 필요할 때만 내려받아 사용 */
+let occtPromise=null;
+function loadOcct(){
+  if(occtPromise)return occtPromise;
+  occtPromise=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/occt-import-js.js';
+    s.onload=()=>{
+      occtimportjs({locateFile:f=>'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist/'+f})
+        .then(res,rej);
+    };
+    s.onerror=()=>{occtPromise=null;
+      rej(new Error(t('stepNet')));};
+    document.head.appendChild(s);
+  });
+  return occtPromise;
+}
+async function loadSTEP(buffer){
+  setMsg(t('stepPrep'));
+  const occt=await loadOcct();
+  setMsg(t('stepConv'));
+  const result=occt.ReadStepFile(new Uint8Array(buffer),null);
+  if(!result.success||!result.meshes.length)
+    throw new Error(t('stepNone'));
+  // 모든 파트 메시를 하나의 비인덱스 지오메트리로 병합
+  let total=0;
+  for(const m of result.meshes)total+=m.index.array.length;
+  const pos=new Float32Array(total*3);let o=0;
+  for(const m of result.meshes){
+    const p=m.attributes.position.array,idx=m.index.array;
+    for(let i=0;i<idx.length;i++){const vi=idx[i]*3;
+      pos[o++]=p[vi];pos[o++]=p[vi+1];pos[o++]=p[vi+2];}
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  setMesh(g);show3d();
+  setInfoType('typeStep',result.meshes.length);
+  setMsg(t('stepLoaded')+' — '+result.meshes.length+' '+t('merged'));
+}
+
+/* STL 저장 (바이너리, 변환 적용) */
+function stlOut(){
+  const g=mesh3.geometry.clone();mesh3.updateMatrix();g.applyMatrix4(mesh3.matrix);
+  g.computeVertexNormals();
+  const p=g.attributes.position.array,n=g.attributes.normal.array,T=p.length/9;
+  const buf=new ArrayBuffer(84+T*50),dv=new DataView(buf);
+  dv.setUint32(80,T,true);
+  for(let i=0;i<T;i++){const o=84+i*50;
+    dv.setFloat32(o,n[i*9],true);dv.setFloat32(o+4,n[i*9+1],true);dv.setFloat32(o+8,n[i*9+2],true);
+    for(let v=0;v<3;v++)for(let k=0;k<3;k++)
+      dv.setFloat32(o+12+v*12+k*4,p[i*9+v*3+k],true);
+    dv.setUint16(o+48,0,true);}
+  return buf;
+}
+
+/* ═══════════════ 모드 전환 & 파일 로드 ═══════════════ */
+function show2d(){mode='2d';$('drop').style.display='none';
+  cv.style.display='block';$('c3dwrap').style.display='none';
+  $('sect2d').style.display='block';$('sect3d').style.display='none';
+  setInfoType('typeDxf');resize();fitView();}
+function show3d(){mode='3d';$('drop').style.display='none';
+  cv.style.display='none';$('c3dwrap').style.display='block';
+  $('sect2d').style.display='none';$('sect3d').style.display='block';
+  $('sectSel').style.display='none';
+  const r=stage.getBoundingClientRect();init3d();resize3d(r.width,r.height);
+  $('coords').textContent=t('orbit');}
+function updateInfo(){
+  if(mode==='2d'){$('infoCount').textContent=ents.length+' '+t('objects');
+    const b=bbox2d();$('infoSize').textContent=b?`${b.w.toFixed(1)} × ${b.h.toFixed(1)}`:'—';}
+  else if(mode==='3d'&&triCount)$('infoCount').textContent=triCount.toLocaleString()+' '+t('tris');}
+
+function loadFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  curFileName=file.name.replace(/\.[^.]+$/,'');
+  $('filename').textContent=file.name;fileLoaded=true;
+  if(ext==='dwg'){
+    setMsg(t('dwgMsg'),true);
+    alert(t('dwgAlert'));
+    return;
+  }
+  const rd=new FileReader();
+  if(ext==='dxf'||ext==='obj'){
+    rd.onload=()=>{try{
+      if(ext==='dxf'){ents=parseDXF(rd.result);selected=-1;undoStack=[];
+        if(!ents.length){setMsg(t('noEnts'),true);}
+        show2d();updateInfo();setMsg(t('dxfLoaded')+' — '+ents.length+' '+t('objects'));}
+      else{setMesh(parseOBJ(rd.result));show3d();
+        setInfoType('typeObj');setMsg(t('objLoaded'));}
+    }catch(err){setMsg(t('errRead')+err.message,true);}};
+    rd.readAsText(file);
+  }else if(ext==='stl'){
+    rd.onload=()=>{try{setMesh(parseSTL(rd.result));show3d();
+      setInfoType('typeStl');setMsg(t('stlLoaded'));}
+      catch(err){setMsg(t('errStl')+err.message,true);}};
+    rd.readAsArrayBuffer(file);
+  }else if(ext==='stp'||ext==='step'){
+    rd.onload=()=>{loadSTEP(rd.result)
+      .catch(err=>setMsg(t('errStep')+err.message,true));};
+    rd.readAsArrayBuffer(file);
+  }else setMsg(t('unsupported'),true);
+}
+$('fileIn').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0]);});
+stage.addEventListener('dragover',e=>e.preventDefault());
+stage.addEventListener('drop',e=>{e.preventDefault();
+  if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
+
+/* ═══════════════ 저장 ═══════════════ */
+$('btnSaveNative').addEventListener('click',()=>{
+  if(mode==='2d'){download(curFileName+'.dxf',new Blob([dxfOut()],{type:'application/dxf'}));
+    setMsg(t('dxfSaved'));}
+  else if(mode==='3d'&&mesh3){download(curFileName+'.stl',new Blob([stlOut()]));
+    setMsg(t('stlSaved'));}
+});
+$('btnSavePng').addEventListener('click',()=>{
+  const src=mode==='3d'?renderer.domElement:cv;
+  if(!mode)return;
+  src.toBlob(b=>download(curFileName+'.png',b));setMsg(t('pngSaved'));
+});
+$('btnSavePdf').addEventListener('click',()=>{
+  if(!mode)return;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  let img;
+  if(mode==='2d'){
+    // 인쇄용: 흰 배경·검정 선, 고해상도 오프스크린 렌더
+    const b=bbox2d();if(!b)return;
+    const M=60, W=3000, H=Math.round(W*(210-2*15)/(297-2*15));
+    const oc=document.createElement('canvas');oc.width=W;oc.height=H;
+    const g=oc.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);
+    const s=Math.min((W-2*M)/b.w,(H-2*M)/b.h);
+    const map=(x,y)=>[(x-b.x0)*s+ (W-b.w*s)/2, H-((y-b.y0)*s+(H-b.h*s)/2)];
+    ents.forEach(e=>drawEnt(g,e,{print:{map,scale:s}}));
+    g.fillStyle='#555';g.font='26px monospace';
+    g.fillText(curFileName+'  ·  '+new Date().toISOString().slice(0,10)+'  ·  CADHAUS',30,H-24);
+    img=oc.toDataURL('image/png');
+  }else{
+    const prev=scene.background;scene.background=new THREE.Color(0xffffff);
+    renderer.render(scene,camera);img=renderer.domElement.toDataURL('image/png');
+    scene.background=prev;
+  }
+  doc.addImage(img,'PNG',15,15,297-30,210-30);
+  doc.setFontSize(8);doc.setTextColor(120);
+  doc.text(curFileName+' - CADHAUS',15,206);
+  doc.save(curFileName+'.pdf');setMsg(t('pdfSaved'));
+});
+
+/* ═══════════════ 예제 ═══════════════ */
+function loadDemo2d(){
+  curFileName='sample-plan';fileLoaded=true;
+  $('filename').textContent='sample-plan '+t('sample');
+  ents=[
+    {type:'PLINE',closed:true,v:[[0,0],[120,0],[120,80],[0,80]]},          // 외벽
+    {type:'PLINE',closed:true,v:[[5,5],[115,5],[115,75],[5,75]]},          // 내벽
+    {type:'LINE',x1:60,y1:5,x2:60,y2:45},                                   // 칸막이
+    {type:'ARC',x:60,y:45,r:14,a1:90,a2:180},                               // 문
+    {type:'LINE',x1:60,y1:45,x2:60,y2:59},
+    {type:'CIRCLE',x:30,y:40,r:9,color:'#5fd7ff'},                          // 테이블
+    {type:'CIRCLE',x:90,y:55,r:6,color:'#5fd7ff'},
+    {type:'TEXT',x:16,y:64,h:6,text:'ROOM A'},
+    {type:'TEXT',x:78,y:64,h:6,text:'ROOM B'},
+    {type:'MEASURE',x1:0,y1:-10,x2:120,y2:-10},
+  ];
+  selected=-1;undoStack=[];show2d();updateInfo();
+  setMsg(t('demo2dMsg'));
+}
+function loadDemo3d(){
+  curFileName='sample-part';fileLoaded=true;
+  $('filename').textContent='sample-part '+t('sample');
+  setMesh(new THREE.TorusKnotGeometry(3,.9,140,20));
+  show3d();setInfoType('type3ds');
+  setMsg(t('demo3dMsg'));
+}
+$('btnDemo2d').addEventListener('click',loadDemo2d);
+$('btnDemo3d').addEventListener('click',loadDemo3d);
+$('btnLang').addEventListener('click',()=>{lang=lang==='en'?'ko':'en';applyLang();});
+
+applyLang();
+resize();
+</script>
+</body>
+</html>
