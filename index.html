@@ -6,6 +6,7 @@
 <title>CADHAUS — 2D/3D CAD Viewer · Editor</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --bg:#10151c; --panel:#161d27; --panel2:#1b2432; --line:#28344a;
@@ -48,6 +49,25 @@
   #stage{flex:1;position:relative;min-width:0}
   canvas#c2d{position:absolute;inset:0;display:block;cursor:crosshair}
   #c3dwrap{position:absolute;inset:0;display:none}
+
+  /* ── PDF 뷰어 ── */
+  #pdfWrap{position:absolute;inset:0;display:none;flex-direction:column;background:#0d1219}
+  #pdfWrap.show{display:flex}
+  #pdfScroll{flex:1;overflow:auto;padding:24px 0 70px;display:flex;
+    flex-direction:column;align-items:center;gap:18px}
+  #pdfScroll canvas{background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.5);
+    max-width:96%;height:auto}
+  #pdfNav{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:6px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:6px 8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10}
+  #pdfNav button{width:32px;height:30px;padding:0;font-size:16px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--ink)}
+  #pdfNav button:hover{border-color:var(--accent);color:var(--accent)}
+  #pdfNav button:disabled{opacity:.3;pointer-events:none}
+  #pdfPageInfo,#pdfZoomInfo{font-family:var(--mono);font-size:12px;color:var(--dim);
+    min-width:52px;text-align:center}
+  .pdfNavSep{width:1px;height:20px;background:var(--line);margin:0 4px}
   #drop{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;
     align-items:center;justify-content:center;color:var(--dim);pointer-events:none;z-index:5}
   #drop .big{font-size:17px;color:var(--ink)}
@@ -140,7 +160,7 @@
   <div class="spacer"></div>
   <button id="btnLang" title="Language"><b>EN</b> · KO</button>
   <label class="btn primary" for="fileIn" data-i18n="open">📂 Open File</label>
-  <input type="file" id="fileIn" accept=".dxf,.stl,.obj,.stp,.step,.dwg">
+  <input type="file" id="fileIn" accept=".dxf,.stl,.obj,.stp,.step,.pdf,.dwg">
   <button id="btnDemo2d" data-i18n="demo2d">2D Sample</button>
   <button id="btnDemo3d" data-i18n="demo3d">3D Sample</button>
 </div>
@@ -164,9 +184,21 @@
   <div id="stage">
     <canvas id="c2d"></canvas>
     <div id="c3dwrap"></div>
+    <div id="pdfWrap">
+      <div id="pdfScroll"></div>
+      <div id="pdfNav">
+        <button id="pdfPrev" title="Previous page">‹</button>
+        <span id="pdfPageInfo">1 / 1</span>
+        <button id="pdfNext" title="Next page">›</button>
+        <span class="pdfNavSep"></span>
+        <button id="pdfZoomOut" title="Zoom out">−</button>
+        <span id="pdfZoomInfo">100%</span>
+        <button id="pdfZoomIn" title="Zoom in">+</button>
+      </div>
+    </div>
     <div id="drop">
       <div class="dropTag" data-i18n="dropTag">View, edit, and save your drawings — the easy way</div>
-      <div class="big" data-i18n="dropBig">Drop a DXF · STL · OBJ · STEP file here</div>
+      <div class="big" data-i18n="dropBig">Drop a DXF · STL · OBJ · STEP · PDF file here</div>
       <div class="hint" data-i18n-html="dropHint">2D drawings: DXF (convert DWG to DXF first)<br>
         3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>
         ※ STEP downloads a converter engine (~10MB) on first use — internet required<br>
@@ -298,8 +330,8 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   tCircle:'Circle (C)',tText:'Text (T)',tMeasure:'Measure (M)',tDel:'Delete selection (Del)',
   tUndo:'Undo (Ctrl+Z)',tFit:'Fit to view (F)',
   dropTag:'View, edit, and save your drawings — the easy way',
-  dropBig:'Drop a DXF · STL · OBJ · STEP file here',
-  dropHint:'2D drawings: DXF (convert DWG to DXF first)<br>3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>※ STEP downloads a converter engine (~10MB) on first use — internet required<br>View → quick edits → save as DXF / STL / PNG / PDF',
+  dropBig:'Drop a DXF · STL · OBJ · STEP · PDF file here',
+  dropHint:'2D drawings: DXF (convert DWG to DXF first)<br>3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>PDF drawings: open and view (view-only)<br>※ STEP downloads a converter engine (~10MB) on first use — internet required<br>View → quick edits → save as DXF / STL / PNG / PDF',
   openDemo2d:'Open 2D sample',openDemo3d:'Open 3D sample',
   hFile:'File Info',lType:'Format',lCount:'Objects',lSize:'Size',
   h2d:'2D Settings',snap:'Grid snap',hSel:'Selection',lKind:'Type',lRadius:'Radius',
@@ -336,6 +368,13 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   stepNone:'No shapes could be extracted from this STEP file',
   stepLoaded:'STEP loaded',merged:'parts merged',
   typeDxf:'DXF (2D)',typeObj:'OBJ (3D)',typeStl:'STL (3D)',typeStep:'STEP (3D)',
+  typePdf:'PDF (view)',
+  pages:'pages',
+  pdfOpening:'Opening PDF…',
+  pdfLoaded:'PDF loaded',
+  pdfHint:'View only · use ‹ › to change page, +/− to zoom',
+  pdfViewOnly:'PDF is view-only — editing is not available',
+  errPdf:'PDF error: ',
   type3ds:'3D sample',
   demo2dMsg:'Sample drawing — click to select, drag to move',
   demo3dMsg:'Drag to rotate, scroll to zoom'},
@@ -344,8 +383,8 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   tCircle:'원 (C)',tText:'문자 (T)',tMeasure:'치수 측정 (M)',tDel:'선택 삭제 (Del)',
   tUndo:'실행 취소 (Ctrl+Z)',tFit:'화면에 맞춤 (F)',
   dropTag:'도면을 쉽게 보고, 편집하고, 저장하세요',
-  dropBig:'DXF · STL · OBJ · STEP 파일을 끌어다 놓으세요',
-  dropHint:'2D 도면: DXF (DWG는 DXF로 변환 후 사용)<br>3D 모델: STL(ASCII/바이너리) · OBJ · STP/STEP<br>※ STEP은 첫 사용 시 변환 엔진(약 10MB)을 내려받습니다 — 인터넷 필요<br>보기 → 간단 편집 → DXF / STL / PNG / PDF 저장',
+  dropBig:'DXF · STL · OBJ · STEP · PDF 파일을 끌어다 놓으세요',
+  dropHint:'2D 도면: DXF (DWG는 DXF로 변환 후 사용)<br>3D 모델: STL(ASCII/바이너리) · OBJ · STP/STEP<br>PDF 도면: 열어서 보기 (보기 전용)<br>※ STEP은 첫 사용 시 변환 엔진(약 10MB)을 내려받습니다 — 인터넷 필요<br>보기 → 간단 편집 → DXF / STL / PNG / PDF 저장',
   openDemo2d:'2D 예제 열기',openDemo3d:'3D 예제 열기',
   hFile:'파일 정보',lType:'형식',lCount:'객체 수',lSize:'크기',
   h2d:'2D 설정',snap:'그리드 스냅',hSel:'선택 객체',lKind:'종류',lRadius:'반지름',
@@ -382,6 +421,13 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   stepNone:'STEP 파일에서 형상을 추출하지 못했습니다',
   stepLoaded:'STEP 열기 완료',merged:'개 파트 병합',
   typeDxf:'DXF (2D)',typeObj:'OBJ (3D)',typeStl:'STL (3D)',typeStep:'STEP (3D)',
+  typePdf:'PDF (보기)',
+  pages:'페이지',
+  pdfOpening:'PDF 여는 중…',
+  pdfLoaded:'PDF 열기 완료',
+  pdfHint:'보기 전용 · ‹ › 로 페이지 이동, +/− 로 확대·축소',
+  pdfViewOnly:'PDF는 보기 전용입니다 — 편집은 지원하지 않습니다',
+  errPdf:'PDF 오류: ',
   type3ds:'3D 예제',
   demo2dMsg:'예제 도면 — 클릭해 선택, 드래그로 이동해 보세요',
   demo3dMsg:'드래그로 회전, 휠로 확대해 보세요'}
@@ -903,11 +949,11 @@ function stlOut(){
 
 /* ═══════════════ 모드 전환 & 파일 로드 ═══════════════ */
 function show2d(){mode='2d';$('drop').style.display='none';
-  cv.style.display='block';$('c3dwrap').style.display='none';
+  cv.style.display='block';$('c3dwrap').style.display='none';$('pdfWrap').classList.remove('show');
   $('sect2d').style.display='block';$('sect3d').style.display='none';
   setInfoType('typeDxf');resize();fitView();}
 function show3d(){mode='3d';$('drop').style.display='none';
-  cv.style.display='none';$('c3dwrap').style.display='block';
+  cv.style.display='none';$('c3dwrap').style.display='block';$('pdfWrap').classList.remove('show');
   $('sect2d').style.display='none';$('sect3d').style.display='block';
   $('sectSel').style.display='none';
   const r=stage.getBoundingClientRect();init3d();resize3d(r.width,r.height);
@@ -916,6 +962,48 @@ function updateInfo(){
   if(mode==='2d'){$('infoCount').textContent=ents.length+' '+t('objects');
     const b=bbox2d();$('infoSize').textContent=b?`${b.w.toFixed(1)} × ${b.h.toFixed(1)}`:'—';}
   else if(mode==='3d'&&triCount)$('infoCount').textContent=triCount.toLocaleString()+' '+t('tris');}
+
+/* ═══════════════ PDF 뷰어 (보기 전용) ═══════════════ */
+let pdfDoc=null, pdfPage=1, pdfScale=1.3;
+if(window.pdfjsLib)
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function showPdf(buffer){
+  if(!window.pdfjsLib){setMsg(t('errPdf')+'PDF.js',true);return;}
+  setMsg(t('pdfOpening'));
+  pdfRawBytes=buffer.slice(0);            // 원본 그대로 다시 저장하기 위해 보관
+  pdfDoc=await pdfjsLib.getDocument({data:buffer}).promise;
+  pdfPage=1;pdfScale=1.3;
+  mode='pdf';$('drop').style.display='none';
+  cv.style.display='none';$('c3dwrap').style.display='none';$('pdfWrap').classList.add('show');
+  $('sect2d').style.display='none';$('sect3d').style.display='none';$('sectSel').style.display='none';
+  setInfoType('typePdf');
+  $('infoCount').textContent=pdfDoc.numPages+' '+t('pages');
+  $('infoSize').textContent='—';
+  $('coords').textContent=t('pdfHint');
+  await renderPdfPage();
+  setMsg(t('pdfLoaded')+' — '+pdfDoc.numPages+' '+t('pages'));
+}
+async function renderPdfPage(){
+  if(!pdfDoc)return;
+  const page=await pdfDoc.getPage(pdfPage);
+  const vp=page.getViewport({scale:pdfScale*(window.devicePixelRatio||1)});
+  const sc=$('pdfScroll');sc.innerHTML='';
+  const canvas=document.createElement('canvas');
+  canvas.width=vp.width;canvas.height=vp.height;
+  canvas.style.width=(vp.width/(window.devicePixelRatio||1))+'px';
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  sc.appendChild(canvas);sc.scrollTop=0;
+  $('pdfPageInfo').textContent=pdfPage+' / '+pdfDoc.numPages;
+  $('pdfZoomInfo').textContent=Math.round(pdfScale/1.3*100)+'%';
+  $('pdfPrev').disabled=pdfPage<=1;
+  $('pdfNext').disabled=pdfPage>=pdfDoc.numPages;
+}
+function pdfGoto(n){if(!pdfDoc)return;
+  pdfPage=Math.max(1,Math.min(pdfDoc.numPages,n));renderPdfPage();}
+$('pdfPrev').addEventListener('click',()=>pdfGoto(pdfPage-1));
+$('pdfNext').addEventListener('click',()=>pdfGoto(pdfPage+1));
+$('pdfZoomIn').addEventListener('click',()=>{pdfScale=Math.min(4,pdfScale*1.2);renderPdfPage();});
+$('pdfZoomOut').addEventListener('click',()=>{pdfScale=Math.max(0.4,pdfScale/1.2);renderPdfPage();});
 
 function loadFile(file){
   const ext=file.name.split('.').pop().toLowerCase();
@@ -945,6 +1033,10 @@ function loadFile(file){
     rd.onload=()=>{loadSTEP(rd.result)
       .catch(err=>setMsg(t('errStep')+err.message,true));};
     rd.readAsArrayBuffer(file);
+  }else if(ext==='pdf'){
+    rd.onload=()=>{showPdf(rd.result)
+      .catch(err=>setMsg(t('errPdf')+err.message,true));};
+    rd.readAsArrayBuffer(file);
   }else setMsg(t('unsupported'),true);
 }
 $('fileIn').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0]);});
@@ -953,19 +1045,32 @@ stage.addEventListener('drop',e=>{e.preventDefault();
   if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
 
 /* ═══════════════ 저장 ═══════════════ */
+let pdfRawBytes=null;   // PDF 원본 보관 (그대로 다시 저장용)
 $('btnSaveNative').addEventListener('click',()=>{
   if(mode==='2d'){download(curFileName+'.dxf',new Blob([dxfOut()],{type:'application/dxf'}));
     setMsg(t('dxfSaved'));}
   else if(mode==='3d'&&mesh3){download(curFileName+'.stl',new Blob([stlOut()]));
     setMsg(t('stlSaved'));}
+  else if(mode==='pdf'){setMsg(t('pdfViewOnly'),true);}
 });
 $('btnSavePng').addEventListener('click',()=>{
-  const src=mode==='3d'?renderer.domElement:cv;
   if(!mode)return;
+  if(mode==='pdf'){
+    const c=$('pdfScroll').querySelector('canvas');
+    if(c){c.toBlob(b=>download(curFileName+`-p${pdfPage}.png`,b));
+      setMsg(t('pngSaved')+' (p'+pdfPage+')');}
+    return;
+  }
+  const src=mode==='3d'?renderer.domElement:cv;
   src.toBlob(b=>download(curFileName+'.png',b));setMsg(t('pngSaved'));
 });
 $('btnSavePdf').addEventListener('click',()=>{
   if(!mode)return;
+  if(mode==='pdf'){                       // 원본 PDF 그대로 내려주기
+    if(pdfRawBytes){download(curFileName+'.pdf',
+      new Blob([pdfRawBytes],{type:'application/pdf'}));setMsg(t('pdfSaved'));}
+    return;
+  }
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   let img;

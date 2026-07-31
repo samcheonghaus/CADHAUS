@@ -43,6 +43,7 @@ It's built for the moment you're handed a `.dxf`, `.stl`, `.obj`, or `.step` fil
 | STL | ✅ | ASCII and binary |
 | OBJ | ✅ | Triangulated on load |
 | STEP / STP | ✅ | Requires internet on first use (downloads a ~10 MB WASM engine) |
+| PDF | ✅ | Vector PDF drawings — **view-only** (multi-page, zoom); no editing |
 | DWG | ❌ | Proprietary binary — convert to DXF first (AutoCAD, or free ODA File Converter) |
 
 STEP is imported as a mesh for viewing and format conversion — parametric/B-rep editing is out of scope.
