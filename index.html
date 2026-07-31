@@ -49,7 +49,7 @@
   canvas#c2d{position:absolute;inset:0;display:block;cursor:crosshair}
   #c3dwrap{position:absolute;inset:0;display:none}
   #drop{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;
-    align-items:center;justify-content:center;color:var(--dim);pointer-events:none}
+    align-items:center;justify-content:center;color:var(--dim);pointer-events:none;z-index:5}
   #drop .big{font-size:17px;color:var(--ink)}
   #drop .hint{font-family:var(--mono);font-size:11px;line-height:1.9;text-align:center}
   #drop .actions{pointer-events:auto;display:flex;gap:8px;margin-top:6px}
@@ -84,6 +84,18 @@
     outline:none;min-width:140px;z-index:20}
 
   @media (max-width:760px){ #side{display:none} }
+
+  /* ── 시작 화면 DWG 안내 바 ── */
+  .dwgHint{display:flex;align-items:center;gap:12px;margin-top:22px;max-width:440px;
+    pointer-events:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:13px 15px;text-align:left;cursor:pointer;transition:border-color .15s}
+  .dwgHint:hover{border-color:var(--accent2)}
+  .dwgHintIcon{font-size:22px;line-height:1;flex-shrink:0}
+  .dwgHintText{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .dwgHintText b{color:var(--ink);font-size:13px}
+  .dwgHintText span{color:var(--dim);font-size:11.5px;line-height:1.5}
+  .dwgHintGo{color:var(--accent2);font-size:22px;flex-shrink:0}
 
   /* ── DWG 안내 모달 ── */
   #dwgModal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -159,6 +171,11 @@
         <button onclick="loadDemo2d()" data-i18n="openDemo2d">Open 2D sample</button>
         <button onclick="loadDemo3d()" data-i18n="openDemo3d">Open 3D sample</button>
       </div>
+      <button class="dwgHint" id="dwgHintBar">
+        <span class="dwgHintIcon">📐</span>
+        <span class="dwgHintText"><b data-i18n="dwgBarT">Have a DWG file?</b><span data-i18n="dwgBarD">DWG needs a quick, free conversion to DXF — tap for the 3-step guide.</span></span>
+        <span class="dwgHintGo">›</span>
+      </button>
     </div>
     <input id="textInput" placeholder="Type text, then Enter">
 
@@ -306,6 +323,8 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   dwgS3d:'Drag the new .dxf file into this window. Done.',
   dwgAlt:'No install allowed on your PC? Use a browser converter like <a href="https://cloudconvert.com/dwg-to-dxf" target="_blank" rel="noopener">CloudConvert</a> or <a href="https://products.aspose.app/cad/conversion/dwg-to-dxf" target="_blank" rel="noopener">Aspose</a>, then open the DXF here.',
   dwgGot:'Got it',
+  dwgBarT:'Have a DWG file?',
+  dwgBarD:'DWG needs a quick, free conversion to DXF — tap for the 3-step guide.',
   stepPrep:'Preparing STEP engine… (10–20s on first use)',
   stepConv:'Converting STEP geometry…',
   stepNet:'Could not download the STEP engine (check internet connection)',
@@ -349,6 +368,8 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   dwgS3d:'새로 만들어진 .dxf 파일을 이 창에 끌어다 놓으면 끝입니다.',
   dwgAlt:'PC에 설치가 어려우신가요? <a href="https://cloudconvert.com/dwg-to-dxf" target="_blank" rel="noopener">CloudConvert</a>나 <a href="https://products.aspose.app/cad/conversion/dwg-to-dxf" target="_blank" rel="noopener">Aspose</a> 같은 웹 변환기로 바꾼 뒤 DXF를 여기서 여세요.',
   dwgGot:'확인',
+  dwgBarT:'DWG 파일을 가지고 계신가요?',
+  dwgBarD:'DWG는 무료로 간단히 DXF로 변환하면 됩니다 — 눌러서 3단계 안내를 확인하세요.',
   stepPrep:'STEP 변환 엔진 준비 중… (첫 사용 시 10~20초)',
   stepConv:'STEP 형상 변환 중…',
   stepNet:'STEP 변환 엔진을 내려받지 못했습니다 (인터넷 연결 확인)',
@@ -896,7 +917,7 @@ function loadFile(file){
   $('filename').textContent=file.name;fileLoaded=true;
   if(ext==='dwg'){
     setMsg(t('dwgMsg'),true);
-    $('dwgModal').classList.add('show');
+    openDwg();
     return;
   }
   const rd=new FileReader();
@@ -997,8 +1018,10 @@ $('btnLang').addEventListener('click',()=>{lang=lang==='en'?'ko':'en';applyLang(
 
 /* DWG 안내 카드 닫기 */
 function closeDwg(){$('dwgModal').classList.remove('show');}
+function openDwg(){$('dwgModal').classList.add('show');}
 $('dwgClose').addEventListener('click',closeDwg);
 $('dwgOk').addEventListener('click',closeDwg);
+$('dwgHintBar').addEventListener('click',openDwg);
 $('dwgModal').addEventListener('click',e=>{if(e.target.id==='dwgModal')closeDwg();});
 
 applyLang();
