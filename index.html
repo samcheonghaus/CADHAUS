@@ -44,6 +44,7 @@
     color:var(--dim);font-size:16px;display:flex;align-items:center;justify-content:center;padding:0}
   .tool:hover{color:var(--ink);border-color:var(--line)}
   .tool.active{background:var(--panel2);color:var(--accent);border-color:var(--accent)}
+  .tool.disabled{opacity:.28;pointer-events:none;cursor:default}
   .tsep{width:26px;height:1px;background:var(--line);margin:5px 0}
 
   #stage{flex:1;position:relative;min-width:0}
@@ -172,11 +173,11 @@
     <button class="tool active" data-tool="select" data-i18n-title="tSelect" title="Select / Move (V)">➤</button>
     <button class="tool" data-tool="pan" data-i18n-title="tPan" title="Pan (H)">✋</button>
     <div class="tsep"></div>
-    <button class="tool" data-tool="line" data-i18n-title="tLine" title="Line (L)">╱</button>
-    <button class="tool" data-tool="rect" data-i18n-title="tRect" title="Rectangle (R)">▭</button>
-    <button class="tool" data-tool="circle" data-i18n-title="tCircle" title="Circle (C)">◯</button>
-    <button class="tool" data-tool="text" data-i18n-title="tText" title="Text (T)">Aa</button>
-    <button class="tool" data-tool="measure" data-i18n-title="tMeasure" title="Measure (M)">⇤⇥</button>
+    <button class="tool tool2d" data-tool="line" data-i18n-title="tLine" title="Line (L)">╱</button>
+    <button class="tool tool2d" data-tool="rect" data-i18n-title="tRect" title="Rectangle (R)">▭</button>
+    <button class="tool tool2d" data-tool="circle" data-i18n-title="tCircle" title="Circle (C)">◯</button>
+    <button class="tool tool2d" data-tool="text" data-i18n-title="tText" title="Text (T)">Aa</button>
+    <button class="tool tool2d" data-tool="measure" data-i18n-title="tMeasure" title="Measure (M)">⇤⇥</button>
     <div class="tsep"></div>
     <button class="tool" id="btnDel" data-i18n-title="tDel" title="Delete selection (Del)">🗑</button>
     <button class="tool" id="btnUndo" data-i18n-title="tUndo" title="Undo (Ctrl+Z)">↩</button>
@@ -746,6 +747,7 @@ function startBlank2d(){
   mode='2d';$('drop').style.display='none';
   cv.style.display='block';$('c3dwrap').style.display='none';$('pdfWrap').classList.remove('show');
   $('sect2d').style.display='block';$('sect3d').style.display='none';
+  set2dToolsEnabled(true);
   setInfoType('typeDxf');resize();
   view={cx:0,cy:0,zoom:20};render();updateInfo();
   setMsg(t('blankStarted'));
@@ -960,14 +962,29 @@ function stlOut(){
 }
 
 /* ═══════════════ 모드 전환 & 파일 로드 ═══════════════ */
+function set2dToolsEnabled(on){
+  // 2D 전용 도구(선·사각형·원·문자·측정·삭제·실행취소)를 3D/PDF 모드에서 비활성화
+  document.querySelectorAll('.tool2d').forEach(b=>b.classList.toggle('disabled',!on));
+  $('btnDel').classList.toggle('disabled',!on);
+  $('btnUndo').classList.toggle('disabled',!on);
+  if(!on){ // 2D 도구가 켜져 있던 상태라면 선택 도구로 되돌림
+    if(['line','rect','circle','text','measure'].includes(tool)){
+      tool='select';
+      document.querySelectorAll('.tool[data-tool]').forEach(b=>
+        b.classList.toggle('active',b.dataset.tool==='select'));
+    }
+  }
+}
 function show2d(){mode='2d';$('drop').style.display='none';
   cv.style.display='block';$('c3dwrap').style.display='none';$('pdfWrap').classList.remove('show');
   $('sect2d').style.display='block';$('sect3d').style.display='none';
+  set2dToolsEnabled(true);
   setInfoType('typeDxf');resize();fitView();}
 function show3d(){mode='3d';$('drop').style.display='none';
   cv.style.display='none';$('c3dwrap').style.display='block';$('pdfWrap').classList.remove('show');
   $('sect2d').style.display='none';$('sect3d').style.display='block';
   $('sectSel').style.display='none';
+  set2dToolsEnabled(false);
   const r=stage.getBoundingClientRect();init3d();resize3d(r.width,r.height);
   $('coords').textContent=t('orbit');}
 function updateInfo(){
@@ -988,6 +1005,7 @@ async function showPdf(buffer){
   mode='pdf';$('drop').style.display='none';
   cv.style.display='none';$('c3dwrap').style.display='none';$('pdfWrap').classList.add('show');
   $('sect2d').style.display='none';$('sect3d').style.display='none';$('sectSel').style.display='none';
+  set2dToolsEnabled(false);
   setInfoType('typePdf');
   $('infoCount').textContent=pdfDoc.numPages+' '+t('pages');
   $('infoSize').textContent='—';
