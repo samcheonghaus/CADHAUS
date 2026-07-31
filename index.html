@@ -204,6 +204,7 @@
         ※ STEP downloads a converter engine (~10MB) on first use — internet required<br>
         View → quick edits → save as DXF / STL / PNG / PDF</div>
       <div class="actions">
+        <button onclick="startBlank2d()" data-i18n="newBlank">✏ New drawing</button>
         <button onclick="loadDemo2d()" data-i18n="openDemo2d">Open 2D sample</button>
         <button onclick="loadDemo3d()" data-i18n="openDemo3d">Open 3D sample</button>
       </div>
@@ -375,6 +376,9 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   pdfHint:'View only · use ‹ › to change page, +/− to zoom',
   pdfViewOnly:'PDF is view-only — editing is not available',
   errPdf:'PDF error: ',
+  newBlank:'✏ New drawing',
+  untitled:'Untitled drawing',
+  blankStarted:'New drawing — click on the canvas to draw',
   type3ds:'3D sample',
   demo2dMsg:'Sample drawing — click to select, drag to move',
   demo3dMsg:'Drag to rotate, scroll to zoom'},
@@ -428,6 +432,9 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   pdfHint:'보기 전용 · ‹ › 로 페이지 이동, +/− 로 확대·축소',
   pdfViewOnly:'PDF는 보기 전용입니다 — 편집은 지원하지 않습니다',
   errPdf:'PDF 오류: ',
+  newBlank:'✏ 새 도면',
+  untitled:'새 도면',
+  blankStarted:'새 도면 — 캔버스를 클릭해 그려보세요',
   type3ds:'3D 예제',
   demo2dMsg:'예제 도면 — 클릭해 선택, 드래그로 이동해 보세요',
   demo3dMsg:'드래그로 회전, 휠로 확대해 보세요'}
@@ -734,15 +741,29 @@ document.addEventListener('keydown',e=>{
 function delSelected(){if(mode!=='2d'||selected<0)return;
   saveUndo();ents.splice(selected,1);selected=-1;updateSel();updateInfo();render();setMsg(t('deleted'));}
 
-function setTool(t){tool=t;temp=null;
+function setTool(t){
+  // 아직 아무것도 안 열린 상태에서 그리기/편집 도구를 누르면 빈 2D 도면 시작
+  const drawTools=['line','rect','circle','text','measure','select','pan'];
+  if(mode===null&&drawTools.includes(t))startBlank2d();
+  tool=t;temp=null;
   document.querySelectorAll('.tool[data-tool]').forEach(b=>
     b.classList.toggle('active',b.dataset.tool===t));
   cv.style.cursor=t==='pan'?'grab':'crosshair';render();}
+function startBlank2d(){
+  ents=[];selected=-1;undoStack=[];
+  curFileName='drawing';fileLoaded=true;$('filename').textContent=t('untitled');
+  mode='2d';$('drop').style.display='none';
+  cv.style.display='block';$('c3dwrap').style.display='none';$('pdfWrap').classList.remove('show');
+  $('sect2d').style.display='block';$('sect3d').style.display='none';
+  setInfoType('typeDxf');resize();
+  view={cx:0,cy:0,zoom:20};render();updateInfo();
+  setMsg(t('blankStarted'));
+}
 document.querySelectorAll('.tool[data-tool]').forEach(b=>
   b.addEventListener('click',()=>setTool(b.dataset.tool)));
 $('btnDel').addEventListener('click',delSelected);
 $('btnUndo').addEventListener('click',undo);
-$('btnFit').addEventListener('click',()=>fitView());
+$('btnFit').addEventListener('click',()=>{if(mode===null)startBlank2d();else fitView();});
 
 /* 선택 패널 */
 function updateSel(){
