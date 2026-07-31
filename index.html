@@ -150,6 +150,15 @@
   .dwgOnlineBtns{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .dwgMini{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
   .dwgMini li{color:var(--dim);font-size:12px;line-height:1.5}
+  .dwgAlt2{border-top:1px solid var(--line);padding-top:14px;margin-bottom:16px}
+  .dwgAlt2 summary{cursor:pointer;font-size:12.5px;color:var(--accent2);
+    list-style:none;user-select:none}
+  .dwgAlt2 summary::-webkit-details-marker{display:none}
+  .dwgAlt2 summary::before{content:'▸ ';color:var(--accent2)}
+  .dwgAlt2[open] summary::before{content:'▾ '}
+  .dwgOdaBody{padding-top:10px}
+  .dwgOdaBody p{color:var(--dim);font-size:12px;line-height:1.6;margin-bottom:10px}
+  .dwgOdaBody b{color:var(--ink)}
   .dwgOk{width:100%;background:var(--panel2);border:1px solid var(--line);
     padding:10px;border-radius:8px;font-size:13px;margin-top:16px}
   .dwgOk:hover{border-color:var(--accent);color:var(--accent)}
@@ -244,6 +253,14 @@
           </ol>
         </div>
 
+        <details class="dwgAlt2">
+          <summary data-i18n="dwgOdaSum">Online converter failed? Try the free desktop tool</summary>
+          <div class="dwgOdaBody">
+            <p data-i18n-html="dwgOdaD">Some newer DWG files (AutoCAD 2018+) won't open in online converters. <b>ODA File Converter</b> (free) handles them. Two settings matter: set <b>Output version</b> to an option with <b>DXF</b> (not DWG), and pick an <b>ASCII</b> DXF (not Binary). Choose the folder your DWG is in, then press Start.</p>
+            <a class="dwgBtn dwgBtn2" href="https://www.opendesign.com/guestfiles/oda_file_converter" target="_blank" rel="noopener" data-i18n="dwgDl">Open download page ↗</a>
+          </div>
+        </details>
+
         <button class="dwgOk" id="dwgOk" data-i18n="dwgGot">Got it</button>
       </div>
     </div>
@@ -260,6 +277,7 @@
     <div class="sect" id="sect2d">
       <h3 data-i18n="h2d">2D Settings</h3>
       <label class="check"><input type="checkbox" id="chkSnap" checked> <span data-i18n="snap">Grid snap</span></label>
+      <label class="check" style="margin-top:6px"><input type="checkbox" id="chkPaper"> <span data-i18n="paper">White background (drawing)</span></label>
     </div>
 
     <div class="sect" id="sectSel" style="display:none">
@@ -331,7 +349,7 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   dropHint:'2D drawings: DXF (convert DWG to DXF first)<br>3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>PDF drawings: open and view (view-only)<br>※ STEP downloads a converter engine (~10MB) on first use — internet required<br>View → quick edits → save as DXF / STL / PNG / PDF',
   openDemo2d:'Open 2D sample',openDemo3d:'Open 3D sample',
   hFile:'File Info',lType:'Format',lCount:'Objects',lSize:'Size',
-  h2d:'2D Settings',snap:'Grid snap',hSel:'Selection',lKind:'Type',lRadius:'Radius',
+  h2d:'2D Settings',snap:'Grid snap',paper:'White background (drawing)',hSel:'Selection',lKind:'Type',lRadius:'Radius',
   lText:'Text',lHeight:'Height',h3d:'3D Edit',lColor:'Color',wire:'Wire',
   lRotate:'Rotate',lScale:'Scale',hSave:'Save',saveNative:'💾 Save DXF / STL',
   savePng:'🖼 Save PNG',savePdf:'📄 Save PDF',textPh:'Type text, then Enter',
@@ -354,6 +372,9 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   dwgO1:'Open the converter, drop in your DWG file.',
   dwgO2:'Download the converted DXF.',
   dwgO3:'Drag that DXF into this window. Done.',
+  dwgOdaSum:'Online converter failed? Try the free desktop tool',
+  dwgOdaD:"Some newer DWG files (AutoCAD 2018+) won't open in online converters. <b>ODA File Converter</b> (free) handles them. Two settings matter: set <b>Output version</b> to an option with <b>DXF</b> (not DWG), and pick an <b>ASCII</b> DXF (not Binary). Choose the folder your DWG is in, then press Start.",
+  dwgDl:'Open download page ↗',
   dwgGot:'Got it',
   dwgBarT:'Have a DWG file?',
   dwgBarD:'DWG converts to DXF in seconds — tap to see how.',
@@ -385,7 +406,7 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   dropHint:'2D 도면: DXF (DWG는 DXF로 변환 후 사용)<br>3D 모델: STL(ASCII/바이너리) · OBJ · STP/STEP<br>PDF 도면: 열어서 보기 (보기 전용)<br>※ STEP은 첫 사용 시 변환 엔진(약 10MB)을 내려받습니다 — 인터넷 필요<br>보기 → 간단 편집 → DXF / STL / PNG / PDF 저장',
   openDemo2d:'2D 예제 열기',openDemo3d:'3D 예제 열기',
   hFile:'파일 정보',lType:'형식',lCount:'객체 수',lSize:'크기',
-  h2d:'2D 설정',snap:'그리드 스냅',hSel:'선택 객체',lKind:'종류',lRadius:'반지름',
+  h2d:'2D 설정',snap:'그리드 스냅',paper:'흰 배경(도면 보기)',hSel:'선택 객체',lKind:'종류',lRadius:'반지름',
   lText:'내용',lHeight:'높이',h3d:'3D 편집',lColor:'색상',wire:'와이어',
   lRotate:'회전',lScale:'배율',hSave:'저장',saveNative:'💾 DXF / STL 저장',
   savePng:'🖼 PNG 저장',savePdf:'📄 PDF 저장',textPh:'문자 입력 후 Enter',
@@ -408,6 +429,9 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   dwgO1:'변환기를 열고 DWG 파일을 끌어다 올리세요.',
   dwgO2:'변환된 DXF 파일을 내려받으세요.',
   dwgO3:'그 DXF를 이 창에 끌어다 놓으면 끝입니다.',
+  dwgOdaSum:'온라인 변환이 안 되나요? 무료 데스크톱 도구',
+  dwgOdaD:'최신 DWG(오토캐드 2018 이상)는 온라인 변환기가 못 여는 경우가 있습니다. 그럴 땐 <b>ODA File Converter</b>(무료)를 쓰세요. 설정 두 가지가 중요합니다 — <b>Output version</b>을 <b>DXF</b>가 붙은 항목으로(DWG 아님), 그리고 <b>ASCII</b> DXF로(Binary 아님) 고르세요. DWG가 든 폴더를 선택하고 Start를 누르면 됩니다.',
+  dwgDl:'다운로드 페이지 열기 ↗',
   dwgGot:'확인',
   dwgBarT:'DWG 파일을 가지고 계신가요?',
   dwgBarD:'DWG는 몇 초면 DXF로 바뀝니다 — 눌러서 방법을 확인하세요.',
@@ -453,6 +477,7 @@ function applyLang(){
 const cv=$('c2d'), ctx=cv.getContext('2d');
 let ents=[];                   // {type:'LINE'|'CIRCLE'|'ARC'|'PLINE'|'TEXT'|'MEASURE', ...}
 let view={cx:0,cy:0,zoom:1};
+let paperMode=false;   // DXF 도면 흰 배경(용지) 표시
 let tool='select', selected=-1, undoStack=[];
 let drag=null, temp=null;      // 진행 중 그리기/드래그 상태
 const DPR=window.devicePixelRatio||1;
@@ -480,22 +505,23 @@ function render(){
   if(mode!=='2d'){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,cv.width,cv.height);return;}
   const w=cv.width/DPR,h=cv.height/DPR;
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  ctx.fillStyle='#10151c';ctx.fillRect(0,0,w,h);
+  ctx.fillStyle=paperMode?'#ffffff':'#10151c';ctx.fillRect(0,0,w,h);
   // 그리드
   const step=gridStep();
   const [x0,y1]=S2W(0,0),[x1,y0]=S2W(w,h);
   ctx.lineWidth=1;
+  const gMinor=paperMode?'#eef1f5':'#182130', gMajor=paperMode?'#e0e5ec':'#1f2b3d';
   for(let gx=Math.floor(x0/step)*step;gx<=x1;gx+=step){
     const M=Math.round(gx/step)%5===0;
-    ctx.strokeStyle=M?'#1f2b3d':'#182130';
+    ctx.strokeStyle=M?gMajor:gMinor;
     const [sx]=W2S(gx,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,h);ctx.stroke();}
   for(let gy=Math.floor(y0/step)*step;gy<=y1;gy+=step){
     const M=Math.round(gy/step)%5===0;
-    ctx.strokeStyle=M?'#1f2b3d':'#182130';
+    ctx.strokeStyle=M?gMajor:gMinor;
     const [,sy]=W2S(0,gy);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(w,sy);ctx.stroke();}
   // 원점 축
   const [ox,oy]=W2S(0,0);
-  ctx.strokeStyle='#31425e';ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,h);
+  ctx.strokeStyle=paperMode?'#c8ced6':'#31425e';ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,h);
   ctx.moveTo(0,oy);ctx.lineTo(w,oy);ctx.stroke();
   // 객체
   ents.forEach((e,i)=>drawEnt(ctx,e,{sel:i===selected}));
@@ -503,12 +529,24 @@ function render(){
   $('zoomInfo').textContent=t('zoom')+' '+(view.zoom>=1?view.zoom.toFixed(1):view.zoom.toFixed(3))+'×  '+t('grid')+' '+step;
 }
 
+function darkenForPaper(hex){
+  // 흰 배경에서 잘 보이도록 밝은 색을 60% 톤으로 눌러줌
+  const m=/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if(!m)return '#1a1a1a';
+  let r=parseInt(m[1],16),g=parseInt(m[2],16),b=parseInt(m[3],16);
+  r=Math.round(r*0.6);g=Math.round(g*0.6);b=Math.round(b*0.6);
+  return `rgb(${r},${g},${b})`;
+}
 function drawEnt(g,e,opt={}){
   const P=(x,y)=>opt.print?opt.print.map(x,y):W2S(x,y);
   const z=opt.print?opt.print.scale:view.zoom;
-  g.lineWidth=opt.print?Math.max(.8,1.2):(opt.sel?2.2:1.4);
-  const base=opt.print?'#111':(e.color||'#dce6f2');
-  g.strokeStyle=opt.ghost?'#4da3ff':(opt.sel?'#ffb454':base);
+  const paper=paperMode&&!opt.print;
+  g.lineWidth=opt.print?Math.max(.8,1.2):(opt.sel?2.2:(paper?1:1.4));
+  let base;
+  if(opt.print) base='#111';
+  else if(paper) base=e.color?darkenForPaper(e.color):'#1a1a1a';
+  else base=(e.color||'#dce6f2');
+  g.strokeStyle=opt.ghost?'#4da3ff':(opt.sel?'#ff8a00':base);
   g.fillStyle=g.strokeStyle;
   g.setLineDash(opt.ghost?[5,4]:[]);
   g.beginPath();
@@ -1206,6 +1244,7 @@ function loadFile(file){
   if(ext==='dxf'){
     rd.onload=()=>{try{
       ents=parseDXF(rd.result);selected=-1;undoStack=[];
+      paperMode=true;$('chkPaper').checked=true;   // 실도면은 흰 배경이 보기 좋음
       if(!ents.length){setMsg(t('noEnts'),true);}
       show2d();updateInfo();setMsg(t('dxfLoaded')+' — '+ents.length+' '+t('objects'));
     }catch(err){setMsg(t('errRead')+err.message,true);}};
@@ -1317,6 +1356,7 @@ function loadDemo3d(){
 $('btnDemo2d').addEventListener('click',loadDemo2d);
 $('btnDemo3d').addEventListener('click',loadDemo3d);
 $('btnLang').addEventListener('click',()=>{lang=lang==='en'?'ko':'en';applyLang();});
+$('chkPaper').addEventListener('change',()=>{paperMode=$('chkPaper').checked;render();});
 
 /* DWG 안내 카드 닫기 */
 function closeDwg(){$('dwgModal').classList.remove('show');}
