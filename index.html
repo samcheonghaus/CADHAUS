@@ -149,18 +149,8 @@
   .dwgOnlineBtns{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .dwgMini{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
   .dwgMini li{color:var(--dim);font-size:12px;line-height:1.5}
-  /* ODA 대안(접힘) */
-  .dwgAlt2{border-top:1px solid var(--line);padding-top:14px;margin-bottom:16px}
-  .dwgAlt2 summary{cursor:pointer;font-size:12.5px;color:var(--accent2);
-    list-style:none;user-select:none}
-  .dwgAlt2 summary::-webkit-details-marker{display:none}
-  .dwgAlt2 summary::before{content:'▸ ';color:var(--accent2)}
-  .dwgAlt2[open] summary::before{content:'▾ '}
-  .dwgOdaBody{padding-top:10px}
-  .dwgOdaBody p{color:var(--dim);font-size:12px;line-height:1.6;margin-bottom:10px}
-  .dwgOdaBody b{color:var(--ink)}
   .dwgOk{width:100%;background:var(--panel2);border:1px solid var(--line);
-    padding:10px;border-radius:8px;font-size:13px}
+    padding:10px;border-radius:8px;font-size:13px;margin-top:16px}
   .dwgOk:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
@@ -252,14 +242,6 @@
             <li data-i18n="dwgO3">Drag that DXF into this window. Done.</li>
           </ol>
         </div>
-
-        <details class="dwgAlt2">
-          <summary data-i18n="dwgOdaSum">Convert many files often? Use a desktop tool</summary>
-          <div class="dwgOdaBody">
-            <p data-i18n="dwgOdaD">ODA File Converter (free) batch-converts a whole folder at once. Set <b>Output version</b> to a <b>DXF</b> option, choose your folder, and press Start.</p>
-            <a class="dwgBtn dwgBtn2" href="https://www.opendesign.com/guestfiles/oda_file_converter" target="_blank" rel="noopener" data-i18n="dwgDl">Open download page ↗</a>
-          </div>
-        </details>
 
         <button class="dwgOk" id="dwgOk" data-i18n="dwgGot">Got it</button>
       </div>
@@ -371,9 +353,6 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   dwgO1:'Open the converter, drop in your DWG file.',
   dwgO2:'Download the converted DXF.',
   dwgO3:'Drag that DXF into this window. Done.',
-  dwgOdaSum:'Convert many files often? Use a desktop tool',
-  dwgOdaD:'ODA File Converter (free) batch-converts a whole folder at once. Set <b>Output version</b> to a <b>DXF</b> option, choose your folder, and press Start.',
-  dwgDl:'Open download page ↗',
   dwgGot:'Got it',
   dwgBarT:'Have a DWG file?',
   dwgBarD:'DWG converts to DXF in seconds — tap to see how.',
@@ -428,9 +407,6 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   dwgO1:'변환기를 열고 DWG 파일을 끌어다 올리세요.',
   dwgO2:'변환된 DXF 파일을 내려받으세요.',
   dwgO3:'그 DXF를 이 창에 끌어다 놓으면 끝입니다.',
-  dwgOdaSum:'여러 파일을 자주 변환하시나요? 데스크톱 도구',
-  dwgOdaD:'ODA File Converter(무료)는 폴더 전체를 한 번에 변환합니다. <b>Output version</b>을 <b>DXF</b> 항목으로 바꾸고, 폴더를 고른 뒤 Start를 누르세요.',
-  dwgDl:'다운로드 페이지 열기 ↗',
   dwgGot:'확인',
   dwgBarT:'DWG 파일을 가지고 계신가요?',
   dwgBarD:'DWG는 몇 초면 DXF로 바뀝니다 — 눌러서 방법을 확인하세요.',
