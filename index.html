@@ -543,45 +543,203 @@ function drawEnt(g,e,opt={}){
 
 /* ═══════════════ 2D : DXF 파서 ═══════════════ */
 const ACI={1:'#ff5f5f',2:'#ffd75f',3:'#6fe08f',4:'#5fd7ff',5:'#6f8fff',6:'#ff7fff',8:'#8a8a8a',9:'#c0c0c0'};
-function parseDXF(text){
-  const L=text.split(/\r\n|\r|\n/), out=[];
+/* 바이너리 DXF → (코드,값) 쌍 배열. 실패 시 null */
+function parseBinaryDXF(buf){
+  const dv=new DataView(buf), u8=new Uint8Array(buf);
+  const sentinel='AutoCAD Binary DXF\r\n';
+  let pos=0;
+  for(let k=0;k<sentinel.length;k++)if(u8[pos+k]!==sentinel.charCodeAt(k))return null;
+  pos=22; // sentinel(20) + 0x1a 0x00
+  const dec=new TextDecoder('latin1');
   const pairs=[];
-  for(let i=0;i+1<L.length;i+=2)pairs.push([parseInt(L[i].trim(),10),L[i+1].trim()]);
-  let i=0,inEnt=false;
+  const readStr=()=>{let s=pos;while(pos<u8.length&&u8[pos]!==0)pos++;
+    const str=dec.decode(u8.subarray(s,pos));pos++;return str;};
+  try{
+    while(pos<u8.length-1){
+      const gc=dv.getUint16(pos,true);pos+=2;
+      let val;
+      if(gc<=9)val=readStr();                                   // 문자열
+      else if(gc<20){val=dv.getFloat64(pos,true);pos+=8;}       // 10-19 좌표 double
+      else if(gc<60){val=dv.getFloat64(pos,true);pos+=8;}       // 실수들
+      else if(gc<80){val=dv.getInt16(pos,true);pos+=2;}         // 60-79 16bit int
+      else if(gc<90){val=dv.getInt32(pos,true);pos+=4;}         // 80-89
+      else if(gc<100){val=dv.getInt32(pos,true);pos+=4;}        // 90-99 32bit int
+      else if(gc===100||gc===102||gc===105){val=readStr();}
+      else if(gc<110){val=readStr();}
+      else if(gc<160){val=dv.getFloat64(pos,true);pos+=8;}      // 110-159 double
+      else if(gc<170){val=dv.getFloat64(pos,true);pos+=8;}
+      else if(gc<180){val=dv.getInt16(pos,true);pos+=2;}        // 170-179
+      else if(gc<210){val=dv.getInt16(pos,true);pos+=2;}
+      else if(gc<240){val=dv.getFloat64(pos,true);pos+=8;}      // 210-239 double
+      else if(gc<270){val=dv.getInt16(pos,true);pos+=2;}
+      else if(gc<290){val=dv.getInt16(pos,true);pos+=2;}
+      else if(gc<300){val=(u8[pos]!==0);pos+=1;}                // 290-299 bool
+      else if(gc<310){val=readStr();}                           // 300-309 string
+      else if(gc<320){                                          // 310-319 binary chunk
+        const n=u8[pos];pos+=1+n;val='';}
+      else if(gc<370){val=readStr();}                           // handles/strings
+      else if(gc<390){val=dv.getInt16(pos,true);pos+=2;}
+      else if(gc<400){val=readStr();}
+      else if(gc<410){val=dv.getInt16(pos,true);pos+=2;}
+      else if(gc<420){val=readStr();}
+      else if(gc<430){val=dv.getInt32(pos,true);pos+=4;}
+      else if(gc<440){val=readStr();}
+      else if(gc<450){val=dv.getInt32(pos,true);pos+=4;}
+      else if(gc<460){val=dv.getInt32(pos,true);pos+=4;}
+      else if(gc<470){val=dv.getFloat64(pos,true);pos+=8;}
+      else if(gc<480){val=readStr();}
+      else if(gc<481){val=readStr();}
+      else if(gc<1010){val=readStr();}
+      else if(gc<1060){val=dv.getFloat64(pos,true);pos+=8;}
+      else if(gc<1071){val=dv.getInt16(pos,true);pos+=2;}
+      else {val=dv.getInt32(pos,true);pos+=4;}
+      pairs.push([gc,typeof val==='number'?String(val):val]);
+      if(gc===0&&val==='EOF')break;
+    }
+  }catch(e){ if(!pairs.length) return null; }
+  return pairs;
+}
+
+function parseDXF(input){
+  // input: 문자열(텍스트 DXF) 또는 ArrayBuffer(바이너리 가능)
+  let pairs=null;
+  if(input instanceof ArrayBuffer){
+    pairs=parseBinaryDXF(input);
+    if(!pairs){ // 바이너리 아니면 텍스트로 디코드
+      input=new TextDecoder('latin1').decode(new Uint8Array(input));
+    }
+  }
+  if(!pairs){
+    const L=input.split(/\r\n|\r|\n/);
+    pairs=[];
+    for(let i=0;i+1<L.length;i+=2)pairs.push([parseInt(L[i].trim(),10),L[i+1].trim()]);
+  }
   const num=v=>parseFloat(v)||0;
+
+  // 한 엔티티(그룹코드 0 기준)를 파싱해 로컬 좌표 도형 배열로 변환.
+  // 인덱스 i는 엔티티 시작(코드0 다음)을 가리키고, 파싱 후 다음 코드0 위치를 반환.
+  function readEntity(startI){
+    const T=pairs[startI][1];
+    let i=startI+1;
+    const p={};const verts=[];let mtext='';const bulges=[];
+    const xs=[],ys=[],x11=[],y11=[]; // SPLINE/기타 좌표
+    while(i<pairs.length&&pairs[i][0]!==0){
+      const [cc,vv]=pairs[i];
+      if(cc===10)verts.push([num(vv),0]);
+      else if(cc===20&&verts.length)verts[verts.length-1][1]=num(vv);
+      else if(cc===42&&verts.length)bulges[verts.length-1]=num(vv);
+      else if(cc===11)x11.push(num(vv));
+      else if(cc===21)y11.push(num(vv));
+      else if(cc===1||cc===3)mtext+=vv;
+      else if(p[cc]===undefined)p[cc]=vv;
+      i++;
+    }
+    const col=ACI[parseInt(p[62],10)]||null;
+    const res=[];
+    const add=e=>{if(col&&!e.color)e.color=col;res.push(e);};
+    if(T==='LINE')
+      add({type:'LINE',x1:verts[0]?verts[0][0]:0,y1:verts[0]?verts[0][1]:0,x2:num(p[11]),y2:num(p[21])});
+    else if(T==='CIRCLE'&&verts.length)
+      add({type:'CIRCLE',x:verts[0][0],y:verts[0][1],r:num(p[40])});
+    else if(T==='ARC'&&verts.length)
+      add({type:'ARC',x:verts[0][0],y:verts[0][1],r:num(p[40]),a1:num(p[50]),a2:num(p[51])});
+    else if((T==='LWPOLYLINE'||T==='POLYLINE')&&verts.length>1)
+      add({type:'PLINE',v:verts,closed:(parseInt(p[70],10)&1)===1});
+    else if(T==='ELLIPSE'&&verts.length){
+      // 중심 + 장축끝점(상대) + 축비율 → 폴리라인 근사
+      const cxp=verts[0][0],cyp=verts[0][1],mx=num(p[11]),my=num(p[21]),ratio=num(p[40])||1;
+      const a=Math.hypot(mx,my),b=a*ratio,rot=Math.atan2(my,mx);
+      const s=num(p[41])||0,e2=num(p[42])||Math.PI*2,seg=48,pts=[];
+      for(let k=0;k<=seg;k++){const th=s+(e2-s)*k/seg;
+        const ex=a*Math.cos(th),ey=b*Math.sin(th);
+        pts.push([cxp+ex*Math.cos(rot)-ey*Math.sin(rot),cyp+ex*Math.sin(rot)+ey*Math.cos(rot)]);}
+      add({type:'PLINE',v:pts,closed:Math.abs(e2-s-Math.PI*2)<1e-3});
+    }
+    else if(T==='SPLINE'&&verts.length>1)
+      add({type:'PLINE',v:verts,closed:(parseInt(p[70],10)&1)===1}); // 제어점 연결 근사
+    else if(T==='SOLID'&&verts.length>=3){
+      const q=[verts[0],verts[1],verts[3]||verts[2],verts[2]].filter(Boolean);
+      add({type:'PLINE',v:q,closed:true});
+    }
+    else if((T==='TEXT'||T==='MTEXT')&&verts.length){
+      const tx=mtext.replace(/\\[A-Za-z][^;]*;|[{}]/g,'').replace(/\\P/g,' ').trim();
+      if(tx)add({type:'TEXT',x:verts[0][0],y:verts[0][1],h:num(p[40])||num(p[7])||5,text:tx});
+    }
+    else if(T==='INSERT'&&verts.length){
+      res.push({__insert:true,name:p[2]||mtext||'',
+        x:verts[0][0],y:verts[0][1],
+        sx:num(p[41])||1,sy:num(p[42])||1,
+        rot:(num(p[50])||0)*Math.PI/180,
+        cols:parseInt(p[70],10)||1,rows:parseInt(p[71],10)||1,
+        cspace:num(p[44])||0,rspace:num(p[45])||0});
+    }
+    return {ents:res,next:i};
+  }
+
+  // 1) 블록 정의 수집  2) 엔티티 수집
+  const blocks={};                 // name → {ents:[], bx,by}
+  const rawEnts=[];
+  let i=0, sect=null, curBlock=null;
   while(i<pairs.length){
     const [c,v]=pairs[i];
-    if(c===2&&v==='ENTITIES')inEnt=true;
-    if(c===0&&v==='ENDSEC')inEnt=false;
-    if(inEnt&&c===0&&!['SECTION','ENDSEC'].includes(v)){
-      const T=v;const p={};const verts=[];let mtext='';
-      i++;
-      while(i<pairs.length&&pairs[i][0]!==0){
-        const [cc,vv]=pairs[i];
-        if(cc===10)verts.push([num(vv),0]);
-        else if(cc===20&&verts.length)verts[verts.length-1][1]=num(vv);
-        else if(cc===1||cc===3)mtext+=vv;
-        else p[cc]=vv;
-        i++;
+    if(c===0&&v==='SECTION'){sect=pairs[i+1]&&pairs[i+1][1]==='2'?pairs[i+2][1]:null;}
+    if(c===2&&(v==='BLOCKS'||v==='ENTITIES'))sect=v;
+    if(c===0&&v==='ENDSEC'){sect=null;curBlock=null;}
+
+    if(sect==='BLOCKS'&&c===0&&v==='BLOCK'){
+      // 블록 헤더 파싱
+      let j=i+1;const bp={};const bv=[];
+      while(j<pairs.length&&pairs[j][0]!==0){
+        const [cc,vv]=pairs[j];
+        if(cc===2)bp.name=vv; else if(cc===10)bv.push(num(vv));
+        else if(cc===20)bv.push(num(vv)); j++;}
+      curBlock={name:bp.name,bx:bv[0]||0,by:bv[1]||0,ents:[]};
+      blocks[bp.name]=curBlock;
+      i=j;continue;
+    }
+    if(sect==='BLOCKS'&&c===0&&v==='ENDBLK'){curBlock=null;i++;continue;}
+
+    if(c===0&&!['SECTION','ENDSEC','BLOCK','ENDBLK','SEQEND','TABLE','ENDTAB'].includes(v)){
+      if(sect==='BLOCKS'&&curBlock){
+        const {ents,next}=readEntity(i);curBlock.ents.push(...ents);i=next;continue;
+      }else if(sect==='ENTITIES'){
+        const {ents,next}=readEntity(i);rawEnts.push(...ents);i=next;continue;
       }
-      const col=ACI[parseInt(p[62],10)]||null;
-      const fin=e=>{if(col)e.color=col;out.push(e);};
-      if(T==='LINE'&&verts.length>=1)
-        fin({type:'LINE',x1:verts[0][0],y1:verts[0][1],x2:num(p[11]),y2:num(p[21])});
-      else if(T==='CIRCLE'&&verts.length)
-        fin({type:'CIRCLE',x:verts[0][0],y:verts[0][1],r:num(p[40])});
-      else if(T==='ARC'&&verts.length)
-        fin({type:'ARC',x:verts[0][0],y:verts[0][1],r:num(p[40]),a1:num(p[50]),a2:num(p[51])});
-      else if((T==='LWPOLYLINE'||T==='POLYLINE')&&verts.length>1)
-        fin({type:'PLINE',v:verts,closed:(parseInt(p[70],10)&1)===1});
-      else if((T==='TEXT'||T==='MTEXT')&&verts.length){
-        const t=mtext.replace(/\\\\[A-Za-z][^;]*;|[{}]/g,'').replace(/\\\\P/g,' ');
-        if(t)fin({type:'TEXT',x:verts[0][0],y:verts[0][1],h:num(p[40])||5,text:t});
-      }
-      continue;
     }
     i++;
   }
+
+  // INSERT 전개: 블록 정의를 위치·회전·배율로 변환해 펼침 (중첩 지원, 깊이 제한)
+  const out=[];
+  function place(list,ox,oy,rot,sx,sy,depth){
+    if(depth>8)return;
+    const cos=Math.cos(rot),sin=Math.sin(rot);
+    const tx=(x,y)=>{const X=x*sx,Y=y*sy;return [ox+X*cos-Y*sin, oy+X*sin+Y*cos];};
+    for(const e of list){
+      if(e.__insert){
+        const blk=blocks[e.name];if(!blk)continue;
+        for(let cc=0;cc<(e.cols||1);cc++)for(let rr=0;rr<(e.rows||1);rr++){
+          const [ix,iy]=tx(e.x+cc*(e.cspace||0),e.y+rr*(e.rspace||0));
+          place(blk.ents, ix,iy, rot+e.rot, sx*e.sx, sy*e.sy, depth+1);
+        }
+        continue;
+      }
+      // 블록 로컬좌표를 기준점 보정 후 변환
+      out.push(transformEnt(e,tx,rot,sx,sy));
+    }
+  }
+  function transformEnt(e,tx,rot,sx,sy){
+    const o=Object.assign({},e);
+    const s=(sx+sy)/2;
+    if(e.type==='LINE'){[o.x1,o.y1]=tx(e.x1,e.y1);[o.x2,o.y2]=tx(e.x2,e.y2);}
+    else if(e.type==='CIRCLE'){[o.x,o.y]=tx(e.x,e.y);o.r=e.r*Math.abs(s);}
+    else if(e.type==='ARC'){[o.x,o.y]=tx(e.x,e.y);o.r=e.r*Math.abs(s);
+      const d=rot*180/Math.PI;o.a1=e.a1+d;o.a2=e.a2+d;}
+    else if(e.type==='PLINE'){o.v=e.v.map(p=>tx(p[0],p[1]));}
+    else if(e.type==='TEXT'){[o.x,o.y]=tx(e.x,e.y);o.h=e.h*Math.abs(s);}
+    return o;
+  }
+  place(rawEnts,0,0,0,1,1,0);
   return out;
 }
 
@@ -1045,14 +1203,17 @@ function loadFile(file){
     return;
   }
   const rd=new FileReader();
-  if(ext==='dxf'||ext==='obj'){
+  if(ext==='dxf'){
     rd.onload=()=>{try{
-      if(ext==='dxf'){ents=parseDXF(rd.result);selected=-1;undoStack=[];
-        if(!ents.length){setMsg(t('noEnts'),true);}
-        show2d();updateInfo();setMsg(t('dxfLoaded')+' — '+ents.length+' '+t('objects'));}
-      else{setMesh(parseOBJ(rd.result));show3d();
-        setInfoType('typeObj');setMsg(t('objLoaded'));}
+      ents=parseDXF(rd.result);selected=-1;undoStack=[];
+      if(!ents.length){setMsg(t('noEnts'),true);}
+      show2d();updateInfo();setMsg(t('dxfLoaded')+' — '+ents.length+' '+t('objects'));
     }catch(err){setMsg(t('errRead')+err.message,true);}};
+    rd.readAsArrayBuffer(file);
+  }else if(ext==='obj'){
+    rd.onload=()=>{try{setMesh(parseOBJ(rd.result));show3d();
+      setInfoType('typeObj');setMsg(t('objLoaded'));}
+      catch(err){setMsg(t('errRead')+err.message,true);}};
     rd.readAsText(file);
   }else if(ext==='stl'){
     rd.onload=()=>{try{setMesh(parseSTL(rd.result));show3d();
