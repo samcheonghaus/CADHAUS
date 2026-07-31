@@ -86,16 +86,19 @@
   @media (max-width:760px){ #side{display:none} }
 
   /* ── 시작 화면 DWG 안내 바 ── */
-  .dwgHint{display:flex;align-items:center;gap:12px;margin-top:22px;max-width:440px;
-    pointer-events:auto;
+  .dropTag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent2);margin-bottom:12px;font-family:var(--mono)}
+  .dwgHint{display:flex;align-items:center;gap:13px;margin-top:22px;
+    width:min(520px,88vw);pointer-events:auto;
     background:var(--panel);border:1px solid var(--line);border-radius:11px;
-    padding:13px 15px;text-align:left;cursor:pointer;transition:border-color .15s}
+    padding:13px 16px;text-align:left;cursor:pointer;transition:border-color .15s}
   .dwgHint:hover{border-color:var(--accent2)}
   .dwgHintIcon{font-size:22px;line-height:1;flex-shrink:0}
-  .dwgHintText{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .dwgHintText{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
   .dwgHintText b{color:var(--ink);font-size:13px}
-  .dwgHintText span{color:var(--dim);font-size:11.5px;line-height:1.5}
-  .dwgHintGo{color:var(--accent2);font-size:22px;flex-shrink:0}
+  .dwgHintText span{color:var(--dim);font-size:11.5px;line-height:1.5;
+    white-space:normal;overflow-wrap:anywhere}
+  .dwgHintGo{color:var(--accent2);font-size:22px;flex-shrink:0;align-self:center}
 
   /* ── DWG 안내 모달 ── */
   #dwgModal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
@@ -162,6 +165,7 @@
     <canvas id="c2d"></canvas>
     <div id="c3dwrap"></div>
     <div id="drop">
+      <div class="dropTag" data-i18n="dropTag">View, edit, and save your drawings — the easy way</div>
       <div class="big" data-i18n="dropBig">Drop a DXF · STL · OBJ · STEP file here</div>
       <div class="hint" data-i18n-html="dropHint">2D drawings: DXF (convert DWG to DXF first)<br>
         3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>
@@ -293,6 +297,7 @@ en:{open:'📂 Open File',demo2d:'2D Sample',demo3d:'3D Sample',nofile:'No file'
   tSelect:'Select / Move (V)',tPan:'Pan (H)',tLine:'Line (L)',tRect:'Rectangle (R)',
   tCircle:'Circle (C)',tText:'Text (T)',tMeasure:'Measure (M)',tDel:'Delete selection (Del)',
   tUndo:'Undo (Ctrl+Z)',tFit:'Fit to view (F)',
+  dropTag:'View, edit, and save your drawings — the easy way',
   dropBig:'Drop a DXF · STL · OBJ · STEP file here',
   dropHint:'2D drawings: DXF (convert DWG to DXF first)<br>3D models: STL (ASCII/binary) · OBJ · STP/STEP<br>※ STEP downloads a converter engine (~10MB) on first use — internet required<br>View → quick edits → save as DXF / STL / PNG / PDF',
   openDemo2d:'Open 2D sample',openDemo3d:'Open 3D sample',
@@ -338,6 +343,7 @@ ko:{open:'📂 파일 열기',demo2d:'2D 예제',demo3d:'3D 예제',nofile:'파�
   tSelect:'선택 / 이동 (V)',tPan:'화면 이동 (H)',tLine:'선 그리기 (L)',tRect:'사각형 (R)',
   tCircle:'원 (C)',tText:'문자 (T)',tMeasure:'치수 측정 (M)',tDel:'선택 삭제 (Del)',
   tUndo:'실행 취소 (Ctrl+Z)',tFit:'화면에 맞춤 (F)',
+  dropTag:'도면을 쉽게 보고, 편집하고, 저장하세요',
   dropBig:'DXF · STL · OBJ · STEP 파일을 끌어다 놓으세요',
   dropHint:'2D 도면: DXF (DWG는 DXF로 변환 후 사용)<br>3D 모델: STL(ASCII/바이너리) · OBJ · STP/STEP<br>※ STEP은 첫 사용 시 변환 엔진(약 10MB)을 내려받습니다 — 인터넷 필요<br>보기 → 간단 편집 → DXF / STL / PNG / PDF 저장',
   openDemo2d:'2D 예제 열기',openDemo3d:'3D 예제 열기',
