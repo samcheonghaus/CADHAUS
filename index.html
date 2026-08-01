@@ -660,16 +660,13 @@ function parseDXF(input){
     const T=pairs[startI][1];
     let i=startI+1;
     const p={};const verts=[];let mtext='';const bulges=[];
-    const xs=[],ys=[],x11=[],y11=[]; // SPLINE/기타 좌표
     while(i<pairs.length&&pairs[i][0]!==0){
       const [cc,vv]=pairs[i];
       if(cc===10)verts.push([num(vv),0]);
       else if(cc===20&&verts.length)verts[verts.length-1][1]=num(vv);
       else if(cc===42&&verts.length)bulges[verts.length-1]=num(vv);
-      else if(cc===11)x11.push(num(vv));
-      else if(cc===21)y11.push(num(vv));
       else if(cc===1||cc===3)mtext+=vv;
-      else if(p[cc]===undefined)p[cc]=vv;
+      else if(p[cc]===undefined)p[cc]=vv;   // 11/21(두번째 점) 등은 여기에 저장
       i++;
     }
     const col=ACI[parseInt(p[62],10)]||null;
